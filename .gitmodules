@@ -1,0 +1,8 @@
+[submodule "lua"]
+	path = lua
+	url = https://github.com/lua/lua.git
+	branch = master
+[submodule "SokuLib"]
+	path = SokuLib
+	url = https://github.com/jyanf/Custom_SokuLib.git
+	branch = dev

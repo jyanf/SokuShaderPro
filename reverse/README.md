@@ -50,3 +50,19 @@ HRESULT WINAPI hkD3DXCreateEffect(
     return hr;
 }
 ```
+
+```cpp
+bool __thiscall InitEffectShaders(CBaseEffect *this,void *pdata,uint dsize) {
+  if (this->peffect) {
+    return false;
+  }
+  FUN_004153a0(this); 
+  return !D3DXCreateEffect(//0x8572a8 c2154800 addr D3DX9_33.DLL::D3DXCreateEffect
+      ADDR_D3D9_DEVICE,//0x8a0e30
+      pdata,dsize,
+      0,0,0,0,
+      &this->peffect,0
+  );//0x4181c7 e8 e6744000    CALL D3DX9_33.DLL::D3DXCreateEffect
+}
+```
+
