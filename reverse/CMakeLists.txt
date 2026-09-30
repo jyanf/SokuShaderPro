@@ -1,7 +1,7 @@
 
 
 add_library(extractor SHARED
-  "src/export.cpp"
+  "main.cpp"
 )
 
 target_include_directories(extractor PUBLIC

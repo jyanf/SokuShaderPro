@@ -24,7 +24,7 @@ HRESULT WINAPI hkD3DXCreateEffect(
 
     if (SUCCEEDED(hr) && outEffect && *outEffect) {
         ID3DXBuffer* disasm = nullptr;
-        printf("Catched binary at %p of size %d bytes!\nParsing...\n", src, srcLen);
+        printf("//Catched binary at %p of size %d bytes!\n//Parsing...\n", src, srcLen);
         HRESULT hr2 = D3DXDisassembleEffect(
             *outEffect,
             FALSE,
@@ -41,7 +41,7 @@ HRESULT WINAPI hkD3DXCreateEffect(
 
             disasm->Release();
         } else {
-            puts("Failed!");
+            puts("//Failed!");
         }
     }
 
@@ -66,7 +66,7 @@ extern "C" __declspec(dllexport) bool Initialize(HMODULE hMyModule, HMODULE hPar
 
     oD3DXCreateEffect = SokuLib::TamperNearCall(HookAddr, &hkD3DXCreateEffect);
     
-    VirtualProtect((void*)HookAddr, 5, old, nullptr);
+    VirtualProtect((void*)HookAddr, 5, old, &old);
 	FlushInstructionCache(GetCurrentProcess(), nullptr, 0);
 	return true;
 }
