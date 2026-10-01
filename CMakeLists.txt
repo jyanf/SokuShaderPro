@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 # meta
-set(MY_VERSION 0.0.1 CACHE STRING "ShaderPro version (major.minor.patch [.build])")
+set(MY_VERSION 0.1.0 CACHE STRING "ShaderPro version (major.minor.patch [.build])")
 set(MY_DESCRIPTION "An superset of soku original shading and blending, introducing modern effects." CACHE STRINGS "description")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -33,45 +33,70 @@ else()
 endif()
 configure_file(${CMAKE_SOURCE_DIR}/src/version.rc.in ${CMAKE_BINARY_DIR}/version.rc @ONLY)
 
-option(BUILD_EXTRACTOR OFF "build d3dxeffect extractor")
+# subdirectories
+option(BUILD_EXTRACTOR "build d3dxeffect extractor" OFF)
 if(${BUILD_EXTRACTOR})
   add_subdirectory("${CMAKE_SOURCE_DIR}/reverse")
 endif()
-add_subdirectory(${CMAKE_SOURCE_DIR}/SokuLib EXCLUDE_FROM_ALL)
+
+option(BUILD_WITH_SHADERS "compile into binary then header" ON)
+if(${BUILD_WITH_SHADERS})
+  add_subdirectory("${CMAKE_SOURCE_DIR}/shaders" EXCLUDE_FROM_ALL)
+  get_target_property(SHADER_INCLUDE_DIR shaders INTERFACE_INCLUDE_DIRECTORIES)
+endif()
+
+add_subdirectory("${CMAKE_SOURCE_DIR}/SokuLib" EXCLUDE_FROM_ALL)
+
 
 # target
+file(GLOB_RECURSE GLOB_SOURCE_FILE CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c")
+file(GLOB_RECURSE GLOB_HEADER_FILE CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.hpp" "${CMAKE_SOURCE_DIR}/src/*.h")
+source_group(TREE "${CMAKE_SOURCE_DIR}/src" PREFIX "Source Files" FILES ${GLOB_SOURCE_FILE})
+source_group(TREE "${CMAKE_SOURCE_DIR}/src" PREFIX "Header Files" FILES ${GLOB_HEADER_FILE})
 add_library(${PROJECT_NAME} SHARED
-  ${CMAKE_SOURCE_DIR}/src/export.cpp
-  ${CMAKE_SOURCE_DIR}/src/lua_export.cpp
-  ${CMAKE_BINARY_DIR}/version.rc
+  ${GLOB_SOURCE_FILE} ${GLOB_HEADER_FILE}
+  "${CMAKE_BINARY_DIR}/version.rc"
 )
+if(TARGET extractor)
+  add_dependencies(${PROJECT_NAME} extractor)
+endif()
+if(TARGET shaders)
+  add_dependencies(${PROJECT_NAME} shaders)
+endif()
 add_dependencies(${PROJECT_NAME} SokuLib)
+
+# include
 target_include_directories(${PROJECT_NAME} PRIVATE
   ${CMAKE_SOURCE_DIR}/src
   ${CMAKE_SOURCE_DIR}/lua
   ${CMAKE_SOURCE_DIR}/SokuLib/src ${CMAKE_SOURCE_DIR}/SokuLib/directx
+  ${SHADER_INCLUDE_DIR}
 )
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-  _CRT_SECURE_NO_WARNINGS
-  WINVER=0x0601
-  _WIN32_WINNT=0x0601
-)
-# generator specified
-if(MSVC)
-  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-  target_compile_options(${PROJECT_NAME} PRIVATE /EHsc /nologo)
-  target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:/O2>)
-else()
-  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
-  target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:-O2>)
-endif()
-set_target_properties(${PROJECT_NAME} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
-
-
+# link
 target_link_libraries(${PROJECT_NAME} PRIVATE
   SokuLib
   Shlwapi
 )
+# compile
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+  _CRT_SECURE_NO_WARNINGS
+  # XP 
+  WINVER=0x0501 _WIN32_WINNT=0x0501
+)
+# generator specified
+if(MSVC)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  target_compile_options(${PROJECT_NAME} PRIVATE /EHsc /nologo $<$<CONFIG:Release>:/O2>)
+  target_link_options(${PROJECT_NAME} PRIVATE /SUBSYSTEM:WINDOWS /Brepro)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wno-c++11-narrowing -Wno-microsoft-cast)
+  endif()
+else()
+  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra $<$<CONFIG:Release>:-O2>)
+endif()
+set_target_properties(${PROJECT_NAME} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
+
 
 # install
 set(CMAKE_INSTALL_PREFIX "${CMAKE_SOURCE_DIR}/out" CACHE PATH "Install prefix, can be targeted to game modules folder")
@@ -91,5 +116,9 @@ endif()
 # copy assets
 install(FILES
   # "${CMAKE_SOURCE_DIR}/${PROJECT_NAME}.ini"
+  DESTINATION ${PROJECT_NAME}
+)
+install(DIRECTORY
+  ${CMAKE_SOURCE_DIR}/shaders
   DESTINATION ${PROJECT_NAME}
 )

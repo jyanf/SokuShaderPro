@@ -1,5 +1,3 @@
-
-
 add_library(extractor SHARED
   "main.cpp"
 )
@@ -18,4 +16,10 @@ target_link_libraries(extractor PUBLIC
   SokuLib
   Shlwapi
   d3dx9
+)
+
+file(GLOB_RECURSE DISAS_FILES "${CMAKE_CURRENT_SOURCE_DIR}/asm/*")
+source_group("Disassemble Files" FILES ${DISAS_FILES})
+target_sources(extractor PRIVATE
+  ${DISAS_FILES}
 )

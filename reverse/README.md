@@ -66,3 +66,4 @@ bool __thiscall InitEffectShaders(CBaseEffect *this,void *pdata,uint dsize) {
 }
 ```
 
+> fxc /T fx_2_0 /Fo effect.bin effect.fx
