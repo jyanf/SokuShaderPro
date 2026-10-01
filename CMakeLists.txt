@@ -53,7 +53,7 @@ file(GLOB_RECURSE GLOB_SOURCE_FILE CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.
 file(GLOB_RECURSE GLOB_HEADER_FILE CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.hpp" "${CMAKE_SOURCE_DIR}/src/*.h")
 source_group(TREE "${CMAKE_SOURCE_DIR}/src" PREFIX "Source Files" FILES ${GLOB_SOURCE_FILE})
 source_group(TREE "${CMAKE_SOURCE_DIR}/src" PREFIX "Header Files" FILES ${GLOB_HEADER_FILE})
-add_library(${PROJECT_NAME} SHARED
+add_library(${PROJECT_NAME} MODULE
   ${GLOB_SOURCE_FILE} ${GLOB_HEADER_FILE}
   "${CMAKE_BINARY_DIR}/version.rc"
 )
@@ -73,9 +73,13 @@ target_include_directories(${PROJECT_NAME} PRIVATE
   ${SHADER_INCLUDE_DIR}
 )
 # link
+target_link_directories(${PROJECT_NAME} PUBLIC
+  ${CMAKE_SOURCE_DIR}/SokuLib/lib
+)
 target_link_libraries(${PROJECT_NAME} PRIVATE
   SokuLib
   Shlwapi
+  d3dx9
 )
 # compile
 target_compile_definitions(${PROJECT_NAME} PRIVATE
@@ -102,7 +106,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 set(CMAKE_INSTALL_PREFIX "${CMAKE_SOURCE_DIR}/out" CACHE PATH "Install prefix, can be targeted to game modules folder")
 # copy dll
 install(FILES $<TARGET_FILE:${PROJECT_NAME}> DESTINATION ${PROJECT_NAME})
-if (${BUILD_EXTRACTOR})
+if (TARGET extractor)
   message("extra install extractor")
   install(FILES $<TARGET_FILE:extractor> DESTINATION ${PROJECT_NAME})
 endif()

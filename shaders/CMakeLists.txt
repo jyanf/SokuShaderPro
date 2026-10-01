@@ -24,9 +24,10 @@ foreach(SHADER_FILE IN LISTS SHADER_FILES)
   execute_process(
 	  COMMAND "${FXC_EXECUTABLE}"
 	    /T fx_2_0 
+		/O3
 	    /Fo "${CMAKE_CURRENT_BINARY_DIR}/${SHADER_NAME}.fxo"
-		/Fh "${SHADER_INCLUDE_DIR}/${SHADER_NAME}.h"
-		  /Vn g_${SHADER_NAME}_bytecode
+		/Fh "${SHADER_INCLUDE_DIR}/fx_${SHADER_NAME}.h"
+		  /Vn fx_${SHADER_NAME}_bytecode
 		"${SHADER_FILE}"
 	  RESULT_VARIABLE FXC_RESULT
 	  OUTPUT_VARIABLE FXC_OUTPUT

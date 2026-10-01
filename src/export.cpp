@@ -1,4 +1,23 @@
+#include "main.hpp"
+
 #include "SokuLib.hpp"
+#include <Windows.h>
+#include <Shlwapi.h>
+
+HMODULE spr::hModule = NULL;
+const std::filesystem::path& spr::GetModuleFolder() {
+	static std::filesystem::path cache{};
+	if (cache.empty()) {
+		std::wstring buffer;
+		int len = MAX_PATH + 1;
+		do {
+			buffer.resize(len);
+			len = GetModuleFileNameW(hModule, buffer.data(), buffer.size());
+		} while (len > buffer.size());
+		if (len) cache = std::filesystem::path(buffer.begin(), buffer.end()).parent_path();
+	}
+	return cache;
+}
 
 // We check if the game version is what we target (in our case, Soku 1.10a).
 extern "C" __declspec(dllexport) bool CheckVersion(const BYTE hash[16])
@@ -11,7 +30,6 @@ extern "C" __declspec(dllexport) bool CheckVersion(const BYTE hash[16])
 extern "C" __declspec(dllexport) bool Initialize(HMODULE hMyModule, HMODULE hParentModule)
 {
 	DWORD old;
-
 #ifdef _DEBUG
 	FILE* _;
 
@@ -19,9 +37,14 @@ extern "C" __declspec(dllexport) bool Initialize(HMODULE hMyModule, HMODULE hPar
 	freopen_s(&_, "CONOUT$", "w", stdout);
 	freopen_s(&_, "CONOUT$", "w", stderr);
 #endif
+	spr::hModule = hMyModule;
 
+
+	VirtualProtect((LPVOID)TEXT_SECTION_OFFSET, TEXT_SECTION_SIZE, PAGE_EXECUTE_READWRITE, &old);
+
+	spr::Initialize();
 	
-
+	VirtualProtect((LPVOID)TEXT_SECTION_OFFSET, TEXT_SECTION_SIZE, old, &old);
 	FlushInstructionCache(GetCurrentProcess(), nullptr, 0);
 	return true;
 }

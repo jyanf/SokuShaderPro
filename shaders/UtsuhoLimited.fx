@@ -4,13 +4,6 @@ texture Texture0;
 sampler2D Sampler0 = sampler_state
 {
     Texture = <Texture0>;
-
-    MinFilter = POINT;
-    MagFilter = POINT;
-    MipFilter = NONE;
-
-    AddressU = Clamp;
-    AddressV = Clamp;
 };
 
 float4 Utsuho_Select_Limited(float4 t0)
