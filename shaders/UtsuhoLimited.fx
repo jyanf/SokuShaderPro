@@ -1,14 +1,9 @@
 float4 v4Arg0;
-texture Texture0;
-
-sampler2D Sampler0 = sampler_state
-{
-    Texture = <Texture0>;
-};
+sampler2D Sampler0 : register(s0);
 
 float4 Utsuho_Select_Limited(float4 t0)
 {
-    if (0.26 * (t0.r + t0.b) >= t0.g)
+    if (0.26 * (t0.r + t0.b) - 0.5 > t0.g)
     { //magenta-like color, marking the cape area
         return float4(0.0, 0.0, 0.0, 1.0); //black cape
     } else return t0; //original okuu tex

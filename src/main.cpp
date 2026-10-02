@@ -28,7 +28,7 @@ static std::filesystem::path get_shader_file(const char* file) {
 		return base;
 	} else return {};
 }
-static HRESULT GetEffectHot(CEffect& result, const char* filename, void* pdata, size_t psize) {
+static HRESULT GetEffectWarm(CEffect& result, const char* filename, void* pdata, size_t psize) {
 	HRESULT ret = 1;
 	if (result.effect) return ret;
 	AddListenerWrapper(&result);
@@ -38,10 +38,12 @@ static HRESULT GetEffectHot(CEffect& result, const char* filename, void* pdata, 
 	//note string compiler D3DXCreateEffectCompiler
 	
 	//note ps_1_1 D3DXSHADER_USE_LEGACY_D3DX9_31_DLL;
-	const DWORD compiler_flag = D3DXSHADER_OPTIMIZATION_LEVEL1 | D3DXSHADER_SKIPVALIDATION;
+	const DWORD compiler_flag = D3DXSHADER_OPTIMIZATION_LEVEL1 | D3DXSHADER_SKIPVALIDATION | D3DXSHADER_USE_LEGACY_D3DX9_31_DLL;
 	auto path = get_shader_file(filename);
 	if (!path.empty()) {
-		std::wcout << "Compile dxeffect from file: " << path.c_str();
+		std::wcout << "\x1b[33m"
+			<< "Compile D3DXEffect from file: \n\t" << path.c_str() 
+			<< "\x1b[0m" << std::endl;
 #if 0
 		ret = D3DXCreateEffectCompilerFromFileW(path.c_str(), nullptr, nullptr, compiler_flag, &_compiler, &_errMsg);
 		if (SUCCEEDED(ret) && _compiler) {
@@ -61,12 +63,12 @@ static HRESULT GetEffectHot(CEffect& result, const char* filename, void* pdata, 
 		if (SUCCEEDED(ret) && result.effect) return ret;//build successfully
 #endif
 	}
-	
 	if (_errMsg) { 
-		std::cout
-			<< "Failed to compile target: " << filename << std::endl
-			<< std::string_view((const char*)_errMsg->GetBufferPointer(), _errMsg->GetBufferSize()) << std::endl
-			<< "Fallback to embedded binary" << std::endl;
+		std::cout << "\x1b[31m"//red
+			<< "Failed to compile target: \n\t" << filename << std::endl
+			<< "\t" << std::string_view((const char*)_errMsg->GetBufferPointer(), _errMsg->GetBufferSize()) << std::endl
+			<< "Fallback to embedded binary."
+			<< "\x1b[0m" << std::endl;
 		_errMsg->Release(); 
 	}
 	ret = D3DXCreateEffect(SokuLib::pd3dDev, pdata, psize, nullptr, nullptr, 0, nullptr, &result.effect, &_errMsg);
@@ -77,15 +79,29 @@ bool CEffect::CreateEffect(void* pdata, size_t psize) {
 	
 	HRESULT ret = 1;
 	if constexpr (FX == 0) {
-		ret = GetEffectHot(*this, "SpellBgBlend", (void*)fx_SpellBgBlend_bytecode, sizeof(fx_SpellBgBlend_bytecode));
+		ret = GetEffectWarm(*this, "SpellBgBlend", (void*)fx_SpellBgBlend_bytecode, sizeof(fx_SpellBgBlend_bytecode));
 	} else if constexpr (FX == 1) {
-		ret = GetEffectHot(*this, "Battle", (void*)fx_Battle_bytecode, sizeof(fx_Battle_bytecode));
+		ret = GetEffectWarm(*this, "Battle", (void*)fx_Battle_bytecode, sizeof(fx_Battle_bytecode));
 	} else if constexpr (FX == 2) {
-		ret = GetEffectHot(*this, "UtsuhoLimited", (void*)fx_UtsuhoLimited_bytecode, sizeof(fx_UtsuhoLimited_bytecode));
+		ret = GetEffectWarm(*this, "UtsuhoLimited", (void*)fx_UtsuhoLimited_bytecode, sizeof(fx_UtsuhoLimited_bytecode));
 	} else {
 		return (this->*OrgCreateEffect<FX>{})(pdata, psize);
 	}
-	return ret == 0;
+#ifdef _DEBUG
+	if (SUCCEEDED(ret)) {
+		D3DXEFFECT_DESC effectDesc;
+		this->effect->GetDesc(&effectDesc);
+		puts("Parameters Desc:");
+		for (UINT i = 0; i < effectDesc.Parameters; ++i) {
+			D3DXHANDLE h = this->effect->GetParameter(NULL, i);
+			D3DXPARAMETER_DESC desc;
+			this->effect->GetParameterDesc(h, &desc);
+			printf("\t%s type=%d class=%d\n", desc.Name, desc.Type, desc.Class);
+		}
+		puts("");
+	}
+#endif // _DEBUG
+	return ret == S_OK;
 }
 
 

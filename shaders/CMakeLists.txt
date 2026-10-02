@@ -12,6 +12,11 @@ file(GLOB_RECURSE SHADER_FILES
   "${CMAKE_CURRENT_SOURCE_DIR}/*.fx"
   # "${CMAKE_CURRENT_SOURCE_DIR}/*.hlsl"
 )
+if(NOT SHADER_FILES)
+  message(STATUS "No shader sources found in ${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+set(COMPILED_SHADER_OUTS "")
+set(COMPILED_SHADER_HEADERS "")
 foreach(SHADER_FILE IN LISTS SHADER_FILES)
   get_filename_component(SHADER_NAME "${SHADER_FILE}" NAME_WE)
   set(HEADER_FILE "${SHADER_INCLUDE_DIR}/${SHADER_NAME}.h")
@@ -20,34 +25,55 @@ foreach(SHADER_FILE IN LISTS SHADER_FILES)
   if(SHADER_VAR MATCHES "^[0-9]")
     set(SHADER_VAR "_${SHADER_VAR}")
   endif()
-
+  set(OUT_FXO "${CMAKE_CURRENT_BINARY_DIR}/bin/${SHADER_NAME}.fxo")
+  set(OUT_FXC "${CMAKE_CURRENT_BINARY_DIR}/asm/${SHADER_NAME}.fxc")
+  set(OUT_FXH "${SHADER_INCLUDE_DIR}/fx_${SHADER_NAME}.h")
   # comiple to binary
   execute_process(
-	  COMMAND "${FXC_EXECUTABLE}"
-	    /T fx_2_0 
-		/O3
-	    /Fo "${CMAKE_CURRENT_BINARY_DIR}/bin/${SHADER_NAME}.fxo"
-		/Fc "${CMAKE_CURRENT_BINARY_DIR}/asm/${SHADER_NAME}.fxc"
-		/Fh "${SHADER_INCLUDE_DIR}/fx_${SHADER_NAME}.h"
-		  /Vn fx_${SHADER_VAR}_bytecode
-		"${SHADER_FILE}"
-	  RESULT_VARIABLE FXC_RESULT
-	  OUTPUT_VARIABLE FXC_OUTPUT
-	  ERROR_VARIABLE FXC_ERROR
+	COMMAND "${FXC_EXECUTABLE}"
+	  /T fx_2_0 
+	  /O3
+	  # /Fo "${OUT_FXO}"
+	  # /Fc "${OUT_FXC}"
+	  /Fh "${OUT_FXH}" /Vn fx_${SHADER_VAR}_bytecode
+	  "${SHADER_FILE}"
+	RESULT_VARIABLE FXC_RESULT
+	OUTPUT_VARIABLE FXC_OUTPUT
+	ERROR_VARIABLE FXC_ERROR
   )
-
   if(NOT FXC_RESULT EQUAL 0)
-    message(FATAL_ERROR "Failed to compile shader: ${SHADER_FILE}\n" "${FXC_OUTPUT}\n" "${FXC_ERROR}")
+    message(FATAL_ERROR "Failed to compile shader at configure time: ${SHADER_FILE}\n" "${FXC_OUTPUT}\n" "${FXC_ERROR}")
   endif()
+  add_custom_command(VERBATIM
+    OUTPUT "${OUT_FXH}" "${OUT_FXO}" "${OUT_FXC}"
+	COMMAND "${FXC_EXECUTABLE}"
+	  /T fx_2_0 
+	  /O3
+	  /Fo "${OUT_FXO}"
+	  /Fc "${OUT_FXC}"
+	  /Fh "${OUT_FXH}" /Vn fx_${SHADER_VAR}_bytecode
+	  "${SHADER_FILE}"
+	DEPENDS "${SHADER_FILE}"
+	COMMENT "Compiling full shader files."
+  )
+  list(APPEND COMPILED_SHADER_OUTS "${OUT_FXO}" "${OUT_FXC}" "${OUT_FXH}")
+  list(APPEND COMPILED_SHADER_HEADERS "${OUT_FXH}")
 endforeach()
 
 source_group("Shaders" FILES ${SHADER_FILES})
-add_custom_target(shader_includes
-  SOURCES ${SHADER_FILES}
-)
+source_group("Compiled Headers" FILES ${COMPILED_SHADER_HEADERS})
+if(COMPILED_SHADER_OUTS)
+  add_custom_target(shader_includes
+    SOURCES
+	  ${SHADER_FILES}
+	  ${COMPILED_SHADER_HEADERS}
+    DEPENDS ${COMPILED_SHADER_OUTS}
+  )
+else()
+  add_custom_target(shader_includes SOURCES ${SHADER_FILES})
+endif()
+
 # dummy
 add_library(shaders INTERFACE)
-target_include_directories(shaders 
-  INTERFACE ${SHADER_INCLUDE_DIR}
-)
+target_include_directories(shaders INTERFACE ${SHADER_INCLUDE_DIR})
 add_dependencies(shaders shader_includes)

@@ -17,23 +17,15 @@
 
 float4 v4Arg0;
 float4 v4Arg1;
-texture Texture0;
-texture Texture1;
-sampler2D Sampler0 = sampler_state
-{
-    Texture = <Texture0>;
-};
-sampler2D Sampler1 = sampler_state
-{
-    Texture = <Texture1>;
-};
+sampler2D Sampler0 : register(s0);
+sampler2D Sampler1 : register(s1);
 
-float4 PS_SpellBgBlend(float4 Color : COLOR0, float2 Tex0 : TEXCOORD0, float2 Tex1 : TEXCOORD1) : COLOR0
+float4 PS_SpellBgBlend(float4 color : COLOR0, float2 tex0 : TEXCOORD0, float2 tex1 : TEXCOORD1) : COLOR0
 {
-    float4 r0 = v4Arg0 * tex2D(Sampler0, Tex0); //0.5, 0.5, 1.0, 1.0
-    float4 r1 = v4Arg1 * tex2D(Sampler1, Tex1); //0.5, 0.5, 1.0, 1.0
-    r0.rgb = (r0.rgb + r1.rgb) * 2.0;
-    return r0 * Color;
+    float4 r0 = v4Arg0 * tex2D(Sampler0, tex0); //0.5, 0.5, 1.0, 1.0
+    float4 r1 = v4Arg1 * tex2D(Sampler1, tex1); //0.5, 0.5, 1.0, 1.0
+    r0.rgb = (r0.rgb + r1.rgb) / 2.0;
+    return r0 * color;
 }
 
 technique MainTechnique

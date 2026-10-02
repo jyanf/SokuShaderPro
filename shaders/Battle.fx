@@ -23,18 +23,8 @@ float y;
 float width;
 float height;
 
-texture Texture0;
-texture Texture1;
-
-sampler2D Sampler0 = sampler_state
-{
-    Texture = <Texture0>;
-};
-
-sampler2D Sampler1 = sampler_state
-{
-    Texture = <Texture1>;
-};
+sampler2D Sampler0 : register(s0);
+sampler2D Sampler1 : register(s1);
 
 
 
@@ -164,7 +154,7 @@ float4 PS_DPMask(float2 texCoord : TEXCOORD0, float4 color : COLOR0) : COLOR0
 
 float4 Utsuho_Select(float4 t0, float4 t1)
 {
-    if (0.26 * (t0.r + t0.b) >= t0.g)
+    if (0.26 * (t0.r + t0.b) - 0.5 > t0.g)
     { //magenta-like color, marking the cape area
         return t1; //cape tex
     } else return t0; //original okuu tex
@@ -326,7 +316,7 @@ technique MainTechnique
     }
 
     // --------------------------------------------------------
-    // P2 - DP
+    // P2 - DP (shader type 1)
     // --------------------------------------------------------
     pass P2
     {
@@ -334,7 +324,7 @@ technique MainTechnique
     }
 
     // --------------------------------------------------------
-    // P3 - DP + Mask
+    // P3 - DP + Mask (unused)
     // --------------------------------------------------------
     pass P3
     {
@@ -342,16 +332,16 @@ technique MainTechnique
     }
 
     // --------------------------------------------------------
-    // P4 - Utsuho
+    // P4 - Utsuho (with cape)
     // --------------------------------------------------------
     pass P4
-    {
+    {   
         VertexShader = compile vs_2_0 VS_Utsuho();
         PixelShader = compile ps_2_0 PS_Utsuho();
     }
 
     // --------------------------------------------------------
-    // P5 - Utsuho + Flash
+    // P5 - Utsuho + Flash (shader type 3)
     // --------------------------------------------------------
     pass P5
     {
@@ -360,7 +350,7 @@ technique MainTechnique
     }
 
     // --------------------------------------------------------
-    // P6 - Ex0 + DP
+    // P6 - Ex0 + DP (shader type 1)
     // --------------------------------------------------------
     pass P6
     {

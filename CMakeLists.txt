@@ -156,5 +156,5 @@ add_custom_command(TARGET ${PROJECT_NAME}
         --install "${CMAKE_BINARY_DIR}"
         --config $<CONFIG>
     VERBATIM
-    COMMENT "Manually Install after build."
+    COMMENT "Manually install after build."
 )
