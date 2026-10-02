@@ -1,10 +1,11 @@
-find_program(FXC_EXECUTABLE NAMES fxc.exe fxc)
+find_program(FXC_EXECUTABLE NAMES fxc.exe PATHS "$ENV{DXSDK_DIR}Utilities/bin" PATH_SUFFIXES x64 x86)
 if(NOT FXC_EXECUTABLE)
   message(FATAL_ERROR "fxc.exe was not found. " "Please install the DirectX SDK / Windows SDK or add fxc.exe to PATH." )
 endif()
 message(STATUS "Using fxc: ${FXC_EXECUTABLE}")
+message("fxc.exe from DXSDK_Jun10 is recommended.")
 set(SHADER_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
-file(MAKE_DIRECTORY "${SHADER_INCLUDE_DIR}")
+file(MAKE_DIRECTORY "${SHADER_INCLUDE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/asm" "${CMAKE_CURRENT_BINARY_DIR}/bin")
 
 file(GLOB_RECURSE SHADER_FILES
   CONFIGURE_DEPENDS 
@@ -25,9 +26,10 @@ foreach(SHADER_FILE IN LISTS SHADER_FILES)
 	  COMMAND "${FXC_EXECUTABLE}"
 	    /T fx_2_0 
 		/O3
-	    /Fo "${CMAKE_CURRENT_BINARY_DIR}/${SHADER_NAME}.fxo"
+	    /Fo "${CMAKE_CURRENT_BINARY_DIR}/bin/${SHADER_NAME}.fxo"
+		/Fc "${CMAKE_CURRENT_BINARY_DIR}/asm/${SHADER_NAME}.fxc"
 		/Fh "${SHADER_INCLUDE_DIR}/fx_${SHADER_NAME}.h"
-		  /Vn fx_${SHADER_NAME}_bytecode
+		  /Vn fx_${SHADER_VAR}_bytecode
 		"${SHADER_FILE}"
 	  RESULT_VARIABLE FXC_RESULT
 	  OUTPUT_VARIABLE FXC_OUTPUT

@@ -1,17 +1,19 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.21)
 # meta
 set(MY_VERSION 0.1.0 CACHE STRING "ShaderPro version (major.minor.patch [.build])")
-set(MY_DESCRIPTION "An superset of soku original shading and blending, introducing modern effects." CACHE STRINGS "description")
+set(MY_DESCRIPTION "An superset of soku original shading and blending, introducing modern effects." CACHE STRING "description")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+set(CMAKE_C_STANDARD_REQUIRED TRUE)
 
 project(ShaderPro
   DESCRIPTION ${MY_DESCRIPTION}
   VERSION ${MY_VERSION}
   LANGUAGES C CXX
 )
-set(PROJECT_DESCRIPTION "More shaders for Soku" CACHE STRINGS "description short ver" FORCE)
+set(PROJECT_DESCRIPTION "More shaders for Soku" CACHE STRING "description short ver" FORCE)
 
 if(NOT WIN32)
   message(FATAL_ERROR "This project can only be build as x86(Win32).")
@@ -90,7 +92,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 # generator specified
 if(MSVC)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-  target_compile_options(${PROJECT_NAME} PRIVATE /EHsc /nologo $<$<CONFIG:Release>:/O2>)
+  target_compile_options(${PROJECT_NAME} PRIVATE /EHsc /nologo $<$<CONFIG:Release>:/O2> $<$<CONFIG:Debug>:/ZI /INCREMENTAL>)
   target_link_options(${PROJECT_NAME} PRIVATE /SUBSYSTEM:WINDOWS /Brepro)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_options(${PROJECT_NAME} PRIVATE -Wno-c++11-narrowing -Wno-microsoft-cast)
@@ -101,28 +103,58 @@ endif()
 set_target_properties(${PROJECT_NAME} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 
-
 # install
-set(CMAKE_INSTALL_PREFIX "${CMAKE_SOURCE_DIR}/out" CACHE PATH "Install prefix, can be targeted to game modules folder")
+set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}" CACHE PATH "Install prefix, can be targeted to game folder.")
+cmake_path(APPEND CMAKE_INSTALL_PREFIX "modules" "${PROJECT_NAME}" OUTPUT_VARIABLE CMAKE_INSTALL_DIR)
+message("Will install to ${CMAKE_INSTALL_DIR}")
 # copy dll
-install(FILES $<TARGET_FILE:${PROJECT_NAME}> DESTINATION ${PROJECT_NAME})
+install(FILES $<TARGET_FILE:${PROJECT_NAME}> DESTINATION "${CMAKE_INSTALL_DIR}")
 if (TARGET extractor)
-  message("extra install extractor")
-  install(FILES $<TARGET_FILE:extractor> DESTINATION ${PROJECT_NAME})
+  message("  extra install extractor")
+  install(FILES $<TARGET_FILE:extractor> DESTINATION "${CMAKE_INSTALL_DIR}")
 endif()
-# copy pdb
+# copy pdb if debug build
 if (MSVC)
   install(
     FILES $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:$<TARGET_PDB_FILE:${PROJECT_NAME}>>
-    DESTINATION ${PROJECT_NAME}
+    DESTINATION "${CMAKE_INSTALL_DIR}"
   )
 endif()
 # copy assets
 install(FILES
   # "${CMAKE_SOURCE_DIR}/${PROJECT_NAME}.ini"
-  DESTINATION ${PROJECT_NAME}
+  DESTINATION "${CMAKE_INSTALL_DIR}"
 )
 install(DIRECTORY
   ${CMAKE_SOURCE_DIR}/shaders
-  DESTINATION ${PROJECT_NAME}
+  DESTINATION "${CMAKE_INSTALL_DIR}"
+  FILES_MATCHING
+    PATTERN "*.fx"
+    PATTERN "*.hlsl"
+)
+
+# debugging
+if (MSVC)
+  set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
+  set_target_properties(${PROJECT_NAME} PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_INSTALL_PREFIX}"
+    VS_DEBUGGER_COMMAND "${CMAKE_INSTALL_PREFIX}/th123.exe"
+    VS_DEBUGGER_COMMAND_ARGUMENTS ""
+)
+endif()
+add_custom_command(TARGET ${PROJECT_NAME}
+    PRE_BUILD
+    COMMAND tasklist | findstr th123.exe &&
+            (taskkill /IM th123.exe /F) ||
+            (exit /b 0)
+    COMMENT "Kill all of the game instance."
+)
+add_custom_command(TARGET ${PROJECT_NAME}
+    POST_BUILD
+    COMMAND
+        ${CMAKE_COMMAND}
+        --install "${CMAKE_BINARY_DIR}"
+        --config $<CONFIG>
+    VERBATIM
+    COMMENT "Manually Install after build."
 )

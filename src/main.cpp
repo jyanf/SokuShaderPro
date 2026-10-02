@@ -41,6 +41,7 @@ static HRESULT GetEffectHot(CEffect& result, const char* filename, void* pdata, 
 	const DWORD compiler_flag = D3DXSHADER_OPTIMIZATION_LEVEL1 | D3DXSHADER_SKIPVALIDATION;
 	auto path = get_shader_file(filename);
 	if (!path.empty()) {
+		std::wcout << "Compile dxeffect from file: " << path.c_str();
 #if 0
 		ret = D3DXCreateEffectCompilerFromFileW(path.c_str(), nullptr, nullptr, compiler_flag, &_compiler, &_errMsg);
 		if (SUCCEEDED(ret) && _compiler) {
@@ -54,10 +55,11 @@ static HRESULT GetEffectHot(CEffect& result, const char* filename, void* pdata, 
 			}
 			_compiler->Release();
 		}
-#endif
+#else
 		ret = D3DXCreateEffectFromFileW(SokuLib::pd3dDev, path.c_str(), 
 			nullptr, nullptr, compiler_flag, 0, &result.effect, &_errMsg);
 		if (SUCCEEDED(ret) && result.effect) return ret;//build successfully
+#endif
 	}
 	
 	if (_errMsg) { 
