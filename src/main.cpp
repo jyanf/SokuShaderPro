@@ -3,47 +3,52 @@
 #include "fx_SpellBgBlend.h"
 #include "fx_Battle.h"
 #include "fx_UtsuhoLimited.h"
+#include "fx_BattleEx.h"
 
 #include "SokuLib.hpp"
 
+#include "debug_helper.hpp"
+#include "utsuho_tint_fix.hpp"
+
 namespace spr {
-	
+	auto& g_EffectBattle = *reinterpret_cast<CBaseEffect*>(0x89aafc);
+	//EffectManager EffectManager::instance;
+	using EM = EffectManager;
 	//Fun_CreateEffect ogCreateEffect = nullptr;
 	
-	void AddListenerWrapper(void* obj) {
-		constexpr DWORD dxContext = 0x8a0e10;
-		constexpr uintptr_t addr = 0x4153A0;
-		__asm
-		{
-			mov eax, dxContext
-			push obj
-			call addr
-		}
-	}
-
-static std::filesystem::path get_shader_file(const char* file) {
+	
+static std::filesystem::path get_effect_file(const char* file) {
+	using std::filesystem::path, std::filesystem::is_regular_file;
 	auto base = GetShaderFolder() / file;
-	if (!base.has_extension()) base.replace_extension(".fx");
-	if (std::filesystem::is_regular_file(base)) {
+	if (base.has_extension()) {
+		return is_regular_file(base) ? base : path{};
+	}
+	;
+	if (std::filesystem::is_regular_file(base.replace_extension(".fx")))
 		return base;
-	} else return {};
+
+	if (std::filesystem::is_regular_file(base.replace_extension(".fxo")))
+		return base;
+
+	return {};
 }
-static HRESULT GetEffectWarm(CEffect& result, const char* filename, void* pdata, size_t psize) {
+HRESULT Effect::CreateEffectWarm(Effect& result, const char* filename, void* pdata, size_t psize) {
 	HRESULT ret = 1;
-	if (result.effect) return ret;
-	AddListenerWrapper(&result);
 	ID3DXEffectCompiler* _compiler = nullptr;
 	ID3DXBuffer* _errMsg = nullptr;
 
 	//note string compiler D3DXCreateEffectCompiler
 	
-	//note ps_1_1 D3DXSHADER_USE_LEGACY_D3DX9_31_DLL;
-	const DWORD compiler_flag = D3DXSHADER_OPTIMIZATION_LEVEL1 | D3DXSHADER_SKIPVALIDATION | D3DXSHADER_USE_LEGACY_D3DX9_31_DLL;
-	auto path = get_shader_file(filename);
+	const DWORD compiler_flag = 0
+		| D3DXSHADER_OPTIMIZATION_LEVEL1 | D3DXSHADER_SKIPVALIDATION 
+			| D3DXSHADER_USE_LEGACY_D3DX9_31_DLL //ps_1_1 support
+		| D3DXFX_NOT_CLONEABLE //btw never D3DXFX_LARGEADDRESSAWARE
+		;
+	auto path = get_effect_file(filename);
 	if (!path.empty()) {
-		std::wcout << "\x1b[33m"
-			<< "Compile D3DXEffect from file: \n\t" << path.c_str() 
-			<< "\x1b[0m" << std::endl;
+		std::wcout << DYELLOW
+			<< "Loading/Compiling D3DXEffect from file: \n\t" << path.c_str() 
+			<< DORG << std::endl;
 #if 0
 		ret = D3DXCreateEffectCompilerFromFileW(path.c_str(), nullptr, nullptr, compiler_flag, &_compiler, &_errMsg);
 		if (SUCCEEDED(ret) && _compiler) {
@@ -64,55 +69,60 @@ static HRESULT GetEffectWarm(CEffect& result, const char* filename, void* pdata,
 #endif
 	}
 	if (_errMsg) { 
-		std::cout << "\x1b[31m"//red
-			<< "Failed to compile target: \n\t" << filename << std::endl
-			<< "\t" << std::string_view((const char*)_errMsg->GetBufferPointer(), _errMsg->GetBufferSize()) << std::endl
+		std::cout << DRED
+			<< "Failed to load/compile target: \n\t" << filename << std::endl
+			<< "\t" << std::string_view((const char*)_errMsg->GetBufferPointer(), _errMsg->GetBufferSize())
+			<< DYELLOW
 			<< "Fallback to embedded binary."
-			<< "\x1b[0m" << std::endl;
+			<< DORG << std::endl;
 		_errMsg->Release(); 
 	}
-	ret = D3DXCreateEffect(SokuLib::pd3dDev, pdata, psize, nullptr, nullptr, 0, nullptr, &result.effect, &_errMsg);
+	//use embedded
+	if (pdata) ret = D3DXCreateEffect(SokuLib::pd3dDev, pdata, psize, nullptr, nullptr, compiler_flag, nullptr, &result.effect, &_errMsg);
 	return ret;
 }
+void Effect::debug(HRESULT result) {
+#ifdef _DEBUG
+	fx_debug(this, result);
+#endif // _DEBUG
+}
 template <auto FX>
-bool CEffect::CreateEffect(void* pdata, size_t psize) {
-	
+bool Effect::MyCreateEffect(void* pdata, size_t psize) {
+	if (this->effect) return false;
 	HRESULT ret = 1;
 	if constexpr (FX == 0) {
-		ret = GetEffectWarm(*this, "SpellBgBlend", (void*)fx_SpellBgBlend_bytecode, sizeof(fx_SpellBgBlend_bytecode));
+		Effect::AddListenerWrapper(this);
+		ret = CreateEffectWarm(*this, "SpellBgBlend", (void*)fx_SpellBgBlend_bytecode, sizeof(fx_SpellBgBlend_bytecode));
 	} else if constexpr (FX == 1) {
-		ret = GetEffectWarm(*this, "Battle", (void*)fx_Battle_bytecode, sizeof(fx_Battle_bytecode));
+		//extra
+		EM::instance().get_or_open("BattleEx", (void*)fx_BattleEx_bytecode, sizeof(fx_BattleEx_bytecode));
+		//org
+		Effect::AddListenerWrapper(this);
+		ret = CreateEffectWarm(*this, "Battle", (void*)fx_Battle_bytecode, sizeof(fx_Battle_bytecode));
 	} else if constexpr (FX == 2) {
-		ret = GetEffectWarm(*this, "UtsuhoLimited", (void*)fx_UtsuhoLimited_bytecode, sizeof(fx_UtsuhoLimited_bytecode));
-	} else {
+		Effect::AddListenerWrapper(this);
+		ret = CreateEffectWarm(*this, "UtsuhoLimited", (void*)fx_UtsuhoLimited_bytecode, sizeof(fx_UtsuhoLimited_bytecode));
+	} else if (OrgCreateEffect<FX>{}) {
+		//no AddListenerWrapper cuz already called in org
 		return (this->*OrgCreateEffect<FX>{})(pdata, psize);
 	}
-#ifdef _DEBUG
-	if (SUCCEEDED(ret)) {
-		D3DXEFFECT_DESC effectDesc;
-		this->effect->GetDesc(&effectDesc);
-		puts("Parameters Desc:");
-		for (UINT i = 0; i < effectDesc.Parameters; ++i) {
-			D3DXHANDLE h = this->effect->GetParameter(NULL, i);
-			D3DXPARAMETER_DESC desc;
-			this->effect->GetParameterDesc(h, &desc);
-			printf("\t%s type=%d class=%d\n", desc.Name, desc.Type, desc.Class);
-		}
-		puts("");
-	}
-#endif // _DEBUG
+	this->debug(ret);
 	return ret == S_OK;
 }
 
-
+	decltype(&EffectManager::OnClose) EffectManager::ogOnClose = nullptr;
 void Initialize() {
 	//spell bg
-	OrgCreateEffect<0>_v0 = SokuLib::TamperNearCall(0x471665, &CEffect::CreateEffect<0>);
+	Effect::OrgCreateEffect<0>_v0 = SokuLib::TamperNearCall(0x471665, &Effect::MyCreateEffect<0>);
 	//battle common
-	OrgCreateEffect<1>_v1 = SokuLib::TamperNearCall(0x7fb030, &CEffect::CreateEffect<1>);
+	Effect::OrgCreateEffect<1>_v1 = SokuLib::TamperNearCall(0x7fb030, &Effect::MyCreateEffect<1>);
 	//utsuho cape limited render (unused)
-	OrgCreateEffect<2>_v2 = SokuLib::TamperNearCall(0x7fb049, &CEffect::CreateEffect<2>);
+	Effect::OrgCreateEffect<2>_v2 = SokuLib::TamperNearCall(0x7fb049, &Effect::MyCreateEffect<2>);
 
+	//on soku close
+	EffectManager::ogOnClose = SokuLib::TamperNearCall(0x440568, &EffectManager::OnClose);
+
+	Hook_DrawUtsuhoTint();
 }
 
 

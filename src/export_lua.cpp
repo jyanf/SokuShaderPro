@@ -13,4 +13,6 @@
 
 
 
-//total export
+//total export, need to check hModule!=NULL
+
+//

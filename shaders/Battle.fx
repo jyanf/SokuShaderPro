@@ -205,8 +205,20 @@ float4 PS_UtsuhoFlash(float2 tex0 : TEXCOORD0, float2 tex1 : TEXCOORD1, float4 c
     float4 t0 = tex2D(Sampler0, tex0);
     float4 t1 = tex2D(Sampler1, tex1);
 
-    float4 r0 = Utsuho_Select(t0, t1) * color;
+    float4 r0 = Utsuho_Select(t0, t1); // * color; fixed wrong blend
     r0 = saturate(r0 + v4Arg0);
+
+    return r0 * color;
+}
+//prepare for fix
+float4 PS_UtsuhoMask(float2 tex0 : TEXCOORD0, float2 tex1 : TEXCOORD1, float4 color : COLOR0) : COLOR0
+{
+    float4 t0 = tex2D(Sampler0, tex0);
+    float4 t1 = tex2D(Sampler1, tex1);
+
+    float4 r0 = Utsuho_Select(t0, t1);
+    r0.rgb = lerp(r0.rgb, v4Arg0.rgb, v4Arg0.a);
+    r0.a = t0.a;
 
     return r0 * color;
 }
@@ -234,7 +246,7 @@ float4 PS_UtsuhoDP(float2 tex0 : TEXCOORD0, float2 tex1 : TEXCOORD1, float4 colo
     float4 t0 = tex2D(Sampler0, tex0);
     float4 t1 = tex2D(Sampler1, tex1);
 
-    float4 r0 = Utsuho_Select(t0, t1) * color;
+    float4 r0 = Utsuho_Select(t0, t1); // * color; fixed wrong blend
     r0.rgb = dot(r0.rgb, v4Arg0.rgb);
     
     return r0 * color;
@@ -357,4 +369,14 @@ technique MainTechnique
         VertexShader = compile vs_2_0 VS_Utsuho();
         PixelShader = compile ps_2_0 PS_UtsuhoDP();
     }
+
+    // --------------------------------------------------------
+    // P7 - Utsuho + Mask (shader type 2 fix)
+    // --------------------------------------------------------
+    pass P7
+    {
+        VertexShader = compile vs_2_0 VS_Utsuho();
+        PixelShader = compile ps_2_0 PS_UtsuhoMask();
+    }
+    
 }
