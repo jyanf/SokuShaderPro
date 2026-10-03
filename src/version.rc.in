@@ -21,12 +21,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName", "Fishuwako\0"
-            VALUE "FileVersion", "@MY_VERSION_MAJOR@.@MY_VERSION_MINOR@.@MY_VERSION_PATCH@.@MY_BUILD_DATE@\0"
+            VALUE "FileVersion", "@MY_VERSION_MAJOR@.@MY_VERSION_MINOR@.@MY_VERSION_PATCH@-@MY_BUILD_DATE@\0"
             VALUE "InternalName", "@PROJECT_NAME@.dll\0"
             VALUE "OriginalFilename", "@PROJECT_NAME@.dll\0"
             VALUE "ProductName", "@PROJECT_NAME@\0"
             VALUE "ProductVersion", "@MY_VERSION@\0"
-            VALUE "FileDescription", "@PROJECT_DESCRIPTION@\0"
+            VALUE "FileDescription", "@MY_DESCRIPTION_FILE@\0"
             VALUE "Comments", "@CMAKE_PROJECT_DESCRIPTION@\0"
         END
     END

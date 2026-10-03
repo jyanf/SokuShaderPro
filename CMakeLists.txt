@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 # meta
-set(MY_VERSION 0.1.0 CACHE STRING "ShaderPro version (major.minor.patch [.build])")
+set(MY_VERSION 0.1.1 CACHE STRING "ShaderPro version (major.minor.patch [.build])")
 set(MY_DESCRIPTION "An superset of soku original shading and blending, introducing modern effects." CACHE STRING "description")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -13,7 +13,7 @@ project(ShaderPro
   VERSION ${MY_VERSION}
   LANGUAGES C CXX
 )
-set(PROJECT_DESCRIPTION "More shaders for Soku" CACHE STRING "description short ver" FORCE)
+set(MY_DESCRIPTION_FILE "More shaders types for Soku" CACHE STRING "description short ver")
 
 if(NOT WIN32)
   message(FATAL_ERROR "This project can only be build as x86(Win32).")
@@ -21,7 +21,7 @@ endif()
 
 # generates version.rc
 string(REGEX MATCHALL "[0-9]+" MY_VERSION_PARTS "${MY_VERSION}")
-string(TIMESTAMP MY_BUILD_DATE "%Y%m%d")
+string(TIMESTAMP MY_BUILD_DATE "%y%m%d")
 string(TIMESTAMP MY_BUILD_DATE_SHORT "%m%d")
 list(LENGTH MY_VERSION_PARTS _len)
 list(APPEND MY_VERSION_PARTS 0 0 0)
@@ -33,7 +33,7 @@ if(_len GREATER 3)
 else()
     set(MY_VERSION_BUILD "${MY_BUILD_DATE_SHORT}")
 endif()
-configure_file(${CMAKE_SOURCE_DIR}/src/version.rc.in ${CMAKE_BINARY_DIR}/version.rc @ONLY)
+configure_file("${CMAKE_SOURCE_DIR}/src/version.rc.in" "${CMAKE_BINARY_DIR}/version.rc" @ONLY)
 
 # subdirectories
 option(BUILD_EXTRACTOR "build d3dxeffect extractor" OFF)
@@ -51,7 +51,7 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/SokuLib" EXCLUDE_FROM_ALL)
 
 
 # target
-file(GLOB_RECURSE GLOB_SOURCE_FILE CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c")
+file(GLOB_RECURSE GLOB_SOURCE_FILE CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/*.rc.in")
 file(GLOB_RECURSE GLOB_HEADER_FILE CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.hpp" "${CMAKE_SOURCE_DIR}/src/*.h")
 source_group(TREE "${CMAKE_SOURCE_DIR}/src" PREFIX "Source Files" FILES ${GLOB_SOURCE_FILE})
 source_group(TREE "${CMAKE_SOURCE_DIR}/src" PREFIX "Header Files" FILES ${GLOB_HEADER_FILE})
