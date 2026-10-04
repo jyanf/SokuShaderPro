@@ -1,11 +1,14 @@
 #pragma once
-#include <string>
-#include <iostream>
 #include <Windows.h>
 #include <Shlwapi.h>
+#include <iostream>
 #include <filesystem>
+#include <string>
 #include <unordered_map>
 #include <queue>
+#include <mutex>
+#include <vector>
+#include <optional>
 
 #include "d3d9.h"
 #include "d3dx9.h"
@@ -21,8 +24,8 @@ namespace spr {
 	constexpr DWORD SHADER2_BYTECODE_OFFSET = 0x861428;
 	constexpr size_t SHADER2_BYTECODE_SIZE = 0x684;
 
-	const auto ADDR_C_BASE_EFFECT_VTABLE = (void**)0x871334;
 	struct CBaseEffect {
+		constexpr static auto ADDR_C_BASE_EFFECT_VTABLE = (void**)0x871334;
 		ID3DXEffect* effect = nullptr;
 		inline virtual void OnLostDevice() {
 			//if (effect) effect->OnLostDevice();
@@ -39,8 +42,27 @@ namespace spr {
 	};
 	class Effect : public CBaseEffect {
 		using Base = CBaseEffect;
+		static volatile bool _begined;//lock? we don't need that for single render thread
+		class RenderGuard {
+			Effect* data;
+			RenderGuard(const RenderGuard&) = delete;
+			RenderGuard& operator=(const RenderGuard&) = delete; RenderGuard& operator=(RenderGuard&&) = delete;
+		public:
+			inline RenderGuard(RenderGuard&& other) noexcept {
+				data = std::exchange(other.data, nullptr);
+			}
+			inline RenderGuard(Effect& d) : data(&d) {
+				data->Begins();
+			}
+			inline ~RenderGuard() {
+				if (data) data->Ends();
+			}
+		};
 	public:
+		//do not add non-trivial member
 		bool enabled = false;
+		int tPass=0;
+		D3DXHANDLE tTech = NULL;
 
 		template<auto FX> bool MyCreateEffect(void* pdata, size_t psize);
 		template<auto FX>
@@ -81,8 +103,45 @@ namespace spr {
 			//RemoveListenerWrapper(this); CBaseEffect::~CBaseEffect();
 			reinterpret_cast<void(__fastcall*)(CBaseEffect*)>(0x4181e0)(this);
 		}
+		inline bool check() {
+			return this->effect && enabled;
+		}
+		template<typename T> void Set(LPCSTR key, T in);
+		inline void Commit() { if (check()) { this->effect->CommitChanges(); } }
+		inline bool Switch(LPCSTR techName, short pass=-1) {
+			if (!check() || _begined) return false;
+			if (techName && !(this->tTech = this->effect->GetTechniqueByName(techName))) return false;
+			this->tPass = pass>=0 ? pass : this->tPass;
+			return true;
+		}//you kidding me, cannot get pass index by name??
+		inline bool Switch(int tech, short pass = -1) {
+			if (!check() || _begined) return false;
+			if (tech>=0 && !(this->tTech = this->effect->GetTechnique(tech))) return false;
+			this->tPass = pass >= 0 ? pass : this->tPass;
+			return true;
+		}
+
+		inline bool Begins(int passOverride=-1) {
+			if (!check() || _begined) return false;
+			if (tTech) {
+				this->effect->SetTechnique(tTech);
+				tTech = NULL;
+			}
+			this->effect->Begin(nullptr, 0);//auto saves states
+			this->effect->BeginPass(passOverride>=0 ? passOverride : this->tPass);
+			_begined = true;
+			return true;
+		}
+		inline bool Ends() {
+			if (!check() || !_begined) return false;
+			this->effect->EndPass();
+			this->effect->End();//auto recover states
+			_begined = false;
+			return true;
+		}
+		inline RenderGuard GetRenderGuard() { return *this; }
 	};
-	class EffectManager : std::unordered_map<std::string_view, Effect*> {
+	class EffectManager : std::unordered_map<std::string, Effect*> {
 		using Key = value_type::first_type;
 		using Value = value_type::second_type;
 		using Base = std::unordered_map<Key, Value>;
@@ -101,7 +160,34 @@ namespace spr {
 			size_t embedded_size = 0;
 		};
 		std::queue<FXInfo> waiting;
-		// tech pass tree map
+		// LUT tech & pass meta <--> shaderType
+#ifndef RESERVE_SHADER_COUNT
+#define RESERVE_SHADER_COUNT (256)
+#endif
+		class LUT {
+			struct Entry {
+				std::string effectName;
+				int techIndex = -1;
+				std::string techName;
+				int passIndex = -1;
+				std::string passName;
+			};
+			std::mutex _mtx;
+			int _nextId = RESERVE_SHADER_COUNT;
+			std::unordered_map<int, Entry> _idToEntry;
+			std::unordered_map<std::string, std::vector<int>> _effectToIds;
+			std::unordered_map<std::string, int> _keyToId;
+			inline int _allocId() {
+				return _nextId++; // just linear
+			}
+		public:
+			LUT() = default;
+			LUT(int reserved_no) : _nextId(reserved_no) {}
+			void registerEffect(const std::string& effectName, Effect* eff);
+			std::optional<int> getShaderTypeByURI(const std::string_view& uri);
+			const Entry* getEntryByType(int shaderType);
+		} lut;
+
 	public:
 		static CBaseEffect& g_EffectBattle;
 		//singleton
@@ -126,9 +212,10 @@ namespace spr {
 			return nullptr;
 		}
 		inline Value& get_or_open(Key key, void* ed=nullptr, size_t es=0) {
-			auto [it, inserted] = this->emplace(key, nullptr);
+			auto [it, inserted] = this->try_emplace(key, nullptr);
 			if (inserted) {
 				it->second = new Effect(key, ed, es);
+				lut.registerEffect(key, it->second);
 			}
 			return it->second;
 		}
@@ -153,7 +240,13 @@ namespace spr {
 				waiting.pop();
 			}
 		}
-		
+		Effect* LutSwitch(int type) {
+			const auto entry = lut.getEntryByType(type);
+			if (!entry) return nullptr;
+			Effect* fx = get(entry->effectName);
+			if (fx && fx->Switch(entry->techIndex, entry->passIndex)) return fx;
+			return nullptr;
+		}
 	};
 
 	

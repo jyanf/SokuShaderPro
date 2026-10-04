@@ -6,21 +6,22 @@ namespace {
 
 	inline bool __fastcall tryMoreShaderTypes(SokuLib::v2::AnimationObject* This) {
 		int shaderType = *reinterpret_cast<int*>(&This->renderInfos.shaderType);
-		auto myfx = EM::instance().get("BattleEx");
-		if (!myfx || !myfx->effect) return false;
-		auto& ifx = *myfx->effect;
 		switch (shaderType) {
 			//case -SokuLib::v2::BlendOptions::NORMAL: {
 		case -1: case -2: case -3: case -4: {
-			ifx.SetTechnique("BlendOverrides");
-			//save render state
-			ifx.Begin(nullptr, 0); ifx.BeginPass(-shaderType - 1);
-			//draw
-			This->sprite.render();
-			//restore
-			ifx.EndPass(); ifx.End();
+			auto myfx = EM::instance().get("BattleEx");
+			if (!myfx) return false;
+			myfx->Switch("BlendOverrides", -shaderType-1);
+			{ auto guard = myfx->GetRenderGuard(); This->sprite.render(); }
 		} break;
-		default:
+		default://custom part
+			if (-RESERVE_SHADER_COUNT <= shaderType && shaderType < 0) return false;
+			auto fx = EM::instance().LutSwitch(shaderType);
+			if (fx) {
+				auto _ = fx->GetRenderGuard();
+				This->sprite.render();
+			}
+
 			return false;
 		}
 		return true;

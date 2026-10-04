@@ -63,7 +63,7 @@ extern "C" int APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID lpReser
 // When 2 mods define the same loading priority the loading order is undefined.
 extern "C" __declspec(dllexport) int getPriority()
 {
-	return 0;
+	return 20;
 }
 
 // Not yet implemented in the mod loader, subject to change
@@ -73,3 +73,15 @@ extern "C" __declspec(dllexport) int getPriority()
 // const char *getFailureReason();
 // bool hasChainedHooks();
 // void unHook();
+
+//better call it on soku setup
+// source or bin?
+//SubmitCustomFx[FromFile/String](name, data)
+
+//getType
+
+//
+
+//Begin
+
+//End

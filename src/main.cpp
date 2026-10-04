@@ -15,6 +15,7 @@ namespace spr {
 	using EM = EffectManager;
 	CBaseEffect& EM::g_EffectBattle = *reinterpret_cast<CBaseEffect*>(0x89aafc);
 	//Fun_CreateEffect ogCreateEffect = nullptr;
+	volatile bool Effect::_begined = false;
 	
 	
 static std::filesystem::path get_effect_file(const char* file) {
@@ -49,7 +50,7 @@ HRESULT Effect::CreateEffectWarm(Effect& result, const char* filename, void* pda
 		std::wcout << DYELLOW
 			<< "Loading/Compiling D3DXEffect from file: \n\t" << path.c_str() 
 			<< DORG << std::endl;
-#if 0
+#if 0 //async?
 		ret = D3DXCreateEffectCompilerFromFileW(path.c_str(), nullptr, nullptr, compiler_flag, &_compiler, &_errMsg);
 		if (SUCCEEDED(ret) && _compiler) {
 			ID3DXBuffer* _buffer;
@@ -62,7 +63,7 @@ HRESULT Effect::CreateEffectWarm(Effect& result, const char* filename, void* pda
 			}
 			_compiler->Release();
 		}
-#else
+#else //sync
 		ret = D3DXCreateEffectFromFileW(SokuLib::pd3dDev, path.c_str(), 
 			nullptr, nullptr, compiler_flag, 0, &result.effect, &_errMsg);
 		if (SUCCEEDED(ret) && result.effect) return ret;//build successfully
