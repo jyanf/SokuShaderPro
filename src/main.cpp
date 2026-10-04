@@ -33,7 +33,7 @@ static std::filesystem::path get_effect_file(const char* file) {
 
 	return {};
 }
-HRESULT Effect::CreateEffectWarm(Effect& result, const char* filename, void* pdata, size_t psize) {
+HRESULT Effect::CreateEffectWarm(Effect& result, const char* fxname, void* pdata, size_t psize, const std::filesystem::path& filepath) {
 	HRESULT ret = 1;
 	ID3DXEffectCompiler* _compiler = nullptr;
 	ID3DXBuffer* _errMsg = nullptr;
@@ -45,7 +45,7 @@ HRESULT Effect::CreateEffectWarm(Effect& result, const char* filename, void* pda
 			| D3DXSHADER_USE_LEGACY_D3DX9_31_DLL //ps_1_1 support
 		| D3DXFX_NOT_CLONEABLE //btw never D3DXFX_LARGEADDRESSAWARE
 		;
-	auto path = get_effect_file(filename);
+	auto& path = (filepath.empty() || !std::filesystem::is_regular_file(filepath)) ? get_effect_file(fxname) : filepath;
 	if (!path.empty()) {
 		std::wcout << DYELLOW
 			<< "Loading/Compiling D3DXEffect from file: \n\t" << path.c_str() 
@@ -69,9 +69,9 @@ HRESULT Effect::CreateEffectWarm(Effect& result, const char* filename, void* pda
 		if (SUCCEEDED(ret) && result.effect) return ret;//build successfully
 #endif
 	}
-	if (_errMsg) { 
+	if (_errMsg) {
 		std::cout << DRED
-			<< "Failed to load/compile target: \n\t" << filename << std::endl
+			<< "Failed to load/compile target: \n\t" << fxname << std::endl
 			<< "\t" << std::string_view((const char*)_errMsg->GetBufferPointer(), _errMsg->GetBufferSize())
 			<< DYELLOW
 			<< "Fallback to embedded binary."
@@ -96,7 +96,7 @@ bool Effect::MyCreateEffect(void* pdata, size_t psize) {
 		ret = CreateEffectWarm(*this, "SpellBgBlend", (void*)fx_SpellBgBlend_bytecode, sizeof(fx_SpellBgBlend_bytecode));
 	} else if constexpr (FX == 1) {
 		//extras
-		EM::instance().open_all();
+		EM::instance().NotifyTasker();
 		//org
 		Effect::AddListenerWrapper(this);
 		ret = CreateEffectWarm(*this, "Battle", (void*)fx_Battle_bytecode, sizeof(fx_Battle_bytecode));
@@ -108,7 +108,7 @@ bool Effect::MyCreateEffect(void* pdata, size_t psize) {
 		return (this->*OrgCreateEffect<FX>{})(pdata, psize);
 	}
 	this->debug(ret);
-	return ret == S_OK;
+	return ret == D3D_OK;
 }
 
 	decltype(&EffectManager::OnClose) EffectManager::ogOnClose = nullptr;

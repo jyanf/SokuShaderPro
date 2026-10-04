@@ -43,7 +43,7 @@ namespace {
 }
 namespace spr {
 	void Hook_ObjOnRenderEnd() {
-		EM::instance().require("BattleEx", (void*)fx_BattleEx_bytecode, sizeof(fx_BattleEx_bytecode));
+		EM::instance().AsyncRequire("BattleEx", (void*)fx_BattleEx_bytecode, sizeof(fx_BattleEx_bytecode));
 		ogJaDefault = SokuLib::TamperNearJmpOpr(ADDR_JA_DEFAULT_CASE+1, (DWORD)&jumper);
 	}
 }

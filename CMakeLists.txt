@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 # meta
-set(MY_VERSION 0.1.1 CACHE STRING "ShaderPro version (major.minor.patch [.build])")
+set(MY_VERSION 0.1.3 CACHE STRING "ShaderPro version (major.minor.patch [.build])")
 set(MY_DESCRIPTION "An superset of soku original shading and blending, introducing modern effects." CACHE STRING "description")
 
 set(CMAKE_CXX_STANDARD 20)

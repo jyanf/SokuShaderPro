@@ -90,13 +90,13 @@ namespace spr {
 		inline static void RemoveListenerWrapper(void* obj) {
 			return reinterpret_cast<void(__fastcall*)(void*)>(0x415440)(obj);
 		}
-		static HRESULT CreateEffectWarm(Effect& result, const char* filename, void* pdata, size_t psize);
+		static HRESULT CreateEffectWarm(Effect& result, const char* fxname, void* pdata, size_t psize, const std::filesystem::path& filepath={});
 		
 		void debug(HRESULT result);
-		inline Effect(const std::string_view& name, void* embedded_data=nullptr, size_t embedded_size=0) {
+		inline Effect(const std::string_view& name, void* embedded_data = nullptr, size_t embedded_size = 0, const std::filesystem::path& filepath = {}) {
 			AddListenerWrapper(this);
-			auto ret = CreateEffectWarm(*this, name.data(), embedded_data, embedded_size);
-			enabled = ret == S_OK;
+			auto ret = CreateEffectWarm(*this, name.data(), embedded_data, embedded_size, filepath);
+			enabled = ret == D3D_OK;
 			debug(ret);
 		}
 		inline ~Effect() {//with unregister
@@ -145,21 +145,39 @@ namespace spr {
 		using Key = value_type::first_type;
 		using Value = value_type::second_type;
 		using Base = std::unordered_map<Key, Value>;
+		using Path = std::filesystem::path;
 		//singleton
 		EffectManager() = default;
 		EffectManager(const EffectManager&) = delete; EffectManager(EffectManager&&) = delete;
 		EffectManager& operator=(const EffectManager&) = delete; EffectManager& operator=(EffectManager&&) = delete;
 		inline virtual ~EffectManager() {
+			tasker.stopWorker();
 			for (auto& [k, v] : (*this)) {
 				delete (CBaseEffect*)v;//should not remove listener cuz the whole game is closing
 			}
 		}
-		struct Task {
-			Key name;
-			void* embedded_data = nullptr;
-			size_t embedded_size = 0;
-		};
-		std::queue<Task> waiting;
+		class Tasker {
+			friend EffectManager;
+			struct Task {
+				std::string name;
+				Path filepath{};
+				void* data = nullptr;// owned copy of data
+				size_t size = 0;
+				Task() = default;
+				Task(const Key& n, const Path& fp, void* d, size_t s) : name(n), filepath(fp), data(d), size(s) {}
+			};
+			std::queue<Task> waiting;
+			// worker thread primitives
+			std::thread _worker;
+			std::mutex _queueMtx;
+			std::condition_variable _queueCv;
+			std::atomic<bool> _workerRunning{ false };
+			std::atomic<bool> _stopWorker{ false };
+		public:
+			void workerLoop();
+			void startWorkerIfNeeded();
+			void stopWorker();
+		} tasker;
 		// LUT tech & pass meta <--> shaderType
 #ifndef RESERVE_SHADER_COUNT
 #define RESERVE_SHADER_COUNT (256)
@@ -196,6 +214,7 @@ namespace spr {
 			return instance;
 		}
 		inline static void OnClose() {
+			instance().tasker.stopWorker();
 			for (auto& [k, v] : instance()) {
 				delete v;
 			}
@@ -211,10 +230,10 @@ namespace spr {
 			}
 			return nullptr;
 		}
-		inline Value& get_or_open(Key key, void* ed=nullptr, size_t es=0) {
+		inline Value& get_or_open(Key key, void* ed=nullptr, size_t es=0, const Path& fp={}) {
 			auto [it, inserted] = this->try_emplace(key, nullptr);
 			if (inserted) {
-				it->second = new Effect(key, ed, es);
+				it->second = new Effect(key, ed, es, fp);
 				lut.registerEffect(key, it->second);
 			}
 			return it->second;
@@ -230,6 +249,7 @@ namespace spr {
 			}
 		}
 
+		/*
 		void require(Key key, void* ed = nullptr, size_t es = 0) {
 			waiting.emplace(key, ed, es);
 		}
@@ -239,6 +259,11 @@ namespace spr {
 				get_or_open(info.name, info.embedded_data, info.embedded_size);
 				waiting.pop();
 			}
+		}*/
+		void AsyncRequire(const Key& key, void* ed = nullptr, size_t es = 0, const Path& fp= {});
+		inline void NotifyTasker() {
+			tasker._queueCv.notify_one();
+			tasker.startWorkerIfNeeded();
 		}
 		Effect* LutSwitch(int type) {
 			const auto entry = lut.getEntryByType(type);
@@ -270,6 +295,6 @@ std::filesystem::path GetIniPath();
 
 
 
-	extern CRITICAL_SECTION& D3DContextLock;
+	extern CRITICAL_SECTION& g_D3DContextLock;
 	extern HMODULE hModule;
 }
