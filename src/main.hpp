@@ -27,13 +27,13 @@ namespace spr {
 	struct CBaseEffect {
 		constexpr static auto ADDR_C_BASE_EFFECT_VTABLE = (void**)0x871334;
 		ID3DXEffect* effect = nullptr;
-		inline virtual void OnLostDevice() {
+		inline virtual HRESULT OnLostDevice() {
 			//if (effect) effect->OnLostDevice();
-			return (this->*SokuLib::union_cast<void(CBaseEffect::*)()>(ADDR_C_BASE_EFFECT_VTABLE[0]))();
+			return (this->*SokuLib::union_cast<HRESULT(CBaseEffect::*)()>(ADDR_C_BASE_EFFECT_VTABLE[0]))();
 		}
-		inline virtual void OnResetDevice() {
+		inline virtual HRESULT OnResetDevice() {
 			//if (effect) effect->OnResetDevice();
-			return (this->*SokuLib::union_cast<void(CBaseEffect::*)()>(ADDR_C_BASE_EFFECT_VTABLE[1]))();
+			return (this->*SokuLib::union_cast<HRESULT(CBaseEffect::*)()>(ADDR_C_BASE_EFFECT_VTABLE[1]))();
 		}
 		inline ~CBaseEffect() {//non virtual, without unregister listener
 			//if (effect) { effect->Release(); effect = nullptr; }
@@ -154,12 +154,12 @@ namespace spr {
 				delete (CBaseEffect*)v;//should not remove listener cuz the whole game is closing
 			}
 		}
-		struct FXInfo {
+		struct Task {
 			Key name;
 			void* embedded_data = nullptr;
 			size_t embedded_size = 0;
 		};
-		std::queue<FXInfo> waiting;
+		std::queue<Task> waiting;
 		// LUT tech & pass meta <--> shaderType
 #ifndef RESERVE_SHADER_COUNT
 #define RESERVE_SHADER_COUNT (256)
@@ -270,6 +270,6 @@ std::filesystem::path GetIniPath();
 
 
 
-
+	extern CRITICAL_SECTION& D3DContextLock;
 	extern HMODULE hModule;
 }

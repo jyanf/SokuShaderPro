@@ -16,7 +16,7 @@ namespace spr {
 	CBaseEffect& EM::g_EffectBattle = *reinterpret_cast<CBaseEffect*>(0x89aafc);
 	//Fun_CreateEffect ogCreateEffect = nullptr;
 	volatile bool Effect::_begined = false;
-	
+	auto& g_D3DContextLock = *reinterpret_cast<CRITICAL_SECTION*>(0x8a0e14);
 	
 static std::filesystem::path get_effect_file(const char* file) {
 	using std::filesystem::path, std::filesystem::is_regular_file;
@@ -24,7 +24,7 @@ static std::filesystem::path get_effect_file(const char* file) {
 	//if (base.has_extension()) {
 	//	return is_regular_file(base) ? base : path{};
 	//}
-	;
+	
 	if (std::filesystem::is_regular_file(base.replace_extension(".fx")))
 		return base;
 
