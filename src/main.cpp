@@ -3,26 +3,26 @@
 #include "fx_SpellBgBlend.h"
 #include "fx_Battle.h"
 #include "fx_UtsuhoLimited.h"
-#include "fx_BattleEx.h"
 
 #include "SokuLib.hpp"
 
 #include "debug_helper.hpp"
 #include "utsuho_tint_fix.hpp"
+#include "battle_ex.hpp"
 
 namespace spr {
-	auto& g_EffectBattle = *reinterpret_cast<CBaseEffect*>(0x89aafc);
 	//EffectManager EffectManager::instance;
 	using EM = EffectManager;
+	CBaseEffect& EM::g_EffectBattle = *reinterpret_cast<CBaseEffect*>(0x89aafc);
 	//Fun_CreateEffect ogCreateEffect = nullptr;
 	
 	
 static std::filesystem::path get_effect_file(const char* file) {
 	using std::filesystem::path, std::filesystem::is_regular_file;
 	auto base = GetShaderFolder() / file;
-	if (base.has_extension()) {
-		return is_regular_file(base) ? base : path{};
-	}
+	//if (base.has_extension()) {
+	//	return is_regular_file(base) ? base : path{};
+	//}
 	;
 	if (std::filesystem::is_regular_file(base.replace_extension(".fx")))
 		return base;
@@ -94,8 +94,8 @@ bool Effect::MyCreateEffect(void* pdata, size_t psize) {
 		Effect::AddListenerWrapper(this);
 		ret = CreateEffectWarm(*this, "SpellBgBlend", (void*)fx_SpellBgBlend_bytecode, sizeof(fx_SpellBgBlend_bytecode));
 	} else if constexpr (FX == 1) {
-		//extra
-		EM::instance().get_or_open("BattleEx", (void*)fx_BattleEx_bytecode, sizeof(fx_BattleEx_bytecode));
+		//extras
+		EM::instance().open_all();
 		//org
 		Effect::AddListenerWrapper(this);
 		ret = CreateEffectWarm(*this, "Battle", (void*)fx_Battle_bytecode, sizeof(fx_Battle_bytecode));
@@ -123,6 +123,7 @@ void Initialize() {
 	EffectManager::ogOnClose = SokuLib::TamperNearCall(0x440568, &EffectManager::OnClose);
 
 	Hook_DrawUtsuhoTint();
+	Hook_ObjOnRenderEnd();
 }
 
 

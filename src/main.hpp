@@ -5,6 +5,7 @@
 #include <Shlwapi.h>
 #include <filesystem>
 #include <unordered_map>
+#include <queue>
 
 #include "d3d9.h"
 #include "d3dx9.h"
@@ -94,7 +95,15 @@ namespace spr {
 				delete (CBaseEffect*)v;//should not remove listener cuz the whole game is closing
 			}
 		}
+		struct FXInfo {
+			Key name;
+			void* embedded_data = nullptr;
+			size_t embedded_size = 0;
+		};
+		std::queue<FXInfo> waiting;
+		// tech pass tree map
 	public:
+		static CBaseEffect& g_EffectBattle;
 		//singleton
 		static EffectManager& instance() {
 			static EffectManager instance;
@@ -109,6 +118,13 @@ namespace spr {
 		}
 		static decltype(&OnClose) ogOnClose;
 
+		inline Value get(Key key) {
+			auto it = this->find(key);
+			if (it!=this->end()) {
+				return it->second;
+			}
+			return nullptr;
+		}
 		inline Value& get_or_open(Key key, void* ed=nullptr, size_t es=0) {
 			auto [it, inserted] = this->emplace(key, nullptr);
 			if (inserted) {
@@ -124,6 +140,17 @@ namespace spr {
 			if (it != this->end()) {
 				delete it->second;
 				this->erase(it);
+			}
+		}
+
+		void require(Key key, void* ed = nullptr, size_t es = 0) {
+			waiting.emplace(key, ed, es);
+		}
+		void open_all() {
+			while (!waiting.empty()) {
+				auto& info = waiting.front();
+				get_or_open(info.name, info.embedded_data, info.embedded_size);
+				waiting.pop();
 			}
 		}
 		
@@ -152,5 +179,4 @@ std::filesystem::path GetIniPath();
 
 
 	extern HMODULE hModule;
-	extern CBaseEffect& g_EffectBattle;
 }
