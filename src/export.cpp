@@ -83,26 +83,25 @@ extern "C" __declspec(dllexport) int getPriority()
 //getType
 
 // Preparation, call them as early as possible!
-extern "C" __declspec(dllexport) bool SubmitCompile(const char* name, const void* data, size_t size, const wchar_t* filepath)
+extern "C" __declspec(dllexport) void SubmitCompile(const char* name, const void* data, size_t size, const wchar_t* filepath)
 {
-	if (!name) return false;
+	if (!name) return;
 	auto& EM = spr::EffectManager::instance();
 	EM.AsyncRequire(std::string(name), data, size, filepath);
 }
 
-extern "C" __declspec(dllexport) bool SubmitCompileFromFile(const char* name, const wchar_t* filepath)
+extern "C" __declspec(dllexport) void SubmitCompileFromFile(const char* name, const wchar_t* filepath)
 {
-	if (!name || !filepath) return false;
+	if (!name || !filepath) return;
 	auto& EM = spr::EffectManager::instance();
 	EM.AsyncRequire(std::string(name), nullptr, 0, filepath);
 }
 
-extern "C" __declspec(dllexport) bool SubmitCompileFromData(const char* name, const void* data, size_t size)
+extern "C" __declspec(dllexport) void SubmitCompileFromData(const char* name, const void* data, size_t size)
 {
-	if (!name || !data || size == 0) return false;
+	if (!name || !data || size == 0) return;
 	auto& EM = spr::EffectManager::instance();
 	EM.AsyncRequire(std::string(name), data, size);
-	return true;
 }
 
 

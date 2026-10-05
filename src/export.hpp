@@ -13,13 +13,13 @@
 // name: effect 名称（UTF-8 / narrow string）
 // data: 指向二进制数据 和 size: 数据大小（字节）
 // filepath: 宽字符路径（Windows 路径）
-SPR_API bool SubmitCompile(const char* name, const void* data, size_t size, const wchar_t* filepath);
+SPR_API void SubmitCompile(const char* name, const void* data, size_t size, const wchar_t* filepath);
 
 // 通过文件路径提交编译任务（异步）
-SPR_API bool SubmitCompileFromFile(const char* name, const wchar_t* filepath);
+SPR_API void SubmitCompileFromFile(const char* name, const wchar_t* filepath);
 
 // 通过内存数据提交编译任务（异步）
-SPR_API bool SubmitCompileFromData(const char* name, const void* data, size_t size);
+SPR_API void SubmitCompileFromData(const char* name, const void* data, size_t size);
 
 // 根据 URI 查找 shader id（shaderType）
 // 返回 0 表示未找到或错误

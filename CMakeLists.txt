@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.21)
 # meta
-set(MY_VERSION 0.1.3 CACHE STRING "ShaderPro version (major.minor.patch [.build])")
+set(MY_VERSION 0.1.4 CACHE STRING "ShaderPro version (major.minor.patch [.build])")
 set(MY_DESCRIPTION "An superset of soku original shading and blending, introducing modern effects." CACHE STRING "description")
+option(MY_LUA_EXPORT "Export lua API" ON)
+set(MY_GAME_FOLDER "$ENV{TH123}" CACHE STRING "The game folder, related to install and debugging")
+
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD 17)
@@ -36,6 +39,8 @@ endif()
 configure_file("${CMAKE_SOURCE_DIR}/src/version.rc.in" "${CMAKE_BINARY_DIR}/version.rc" @ONLY)
 
 # subdirectories
+add_subdirectory("${CMAKE_SOURCE_DIR}/thirdparty" EXCLUDE_FROM_ALL)
+
 option(BUILD_EXTRACTOR "build d3dxeffect extractor" OFF)
 if(${BUILD_EXTRACTOR})
   add_subdirectory("${CMAKE_SOURCE_DIR}/reverse")
@@ -46,9 +51,6 @@ if(${BUILD_WITH_SHADERS})
   add_subdirectory("${CMAKE_SOURCE_DIR}/shaders" EXCLUDE_FROM_ALL)
   get_target_property(SHADER_INCLUDE_DIR shaders INTERFACE_INCLUDE_DIRECTORIES)
 endif()
-
-add_subdirectory("${CMAKE_SOURCE_DIR}/SokuLib" EXCLUDE_FROM_ALL)
-
 
 # target
 file(GLOB_RECURSE GLOB_SOURCE_FILE CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/*.rc.in")
@@ -65,30 +67,33 @@ endif()
 if(TARGET shaders)
   add_dependencies(${PROJECT_NAME} shaders)
 endif()
-add_dependencies(${PROJECT_NAME} SokuLib)
+#add_dependencies(${PROJECT_NAME} LuaBridge)
 
 # include
 target_include_directories(${PROJECT_NAME} PRIVATE
   ${CMAKE_SOURCE_DIR}/src
-  ${CMAKE_SOURCE_DIR}/lua
-  ${CMAKE_SOURCE_DIR}/SokuLib/src ${CMAKE_SOURCE_DIR}/SokuLib/directx
   ${SHADER_INCLUDE_DIR}
+  # ${CMAKE_SOURCE_DIR}/SokuLib/src ${CMAKE_SOURCE_DIR}/SokuLib/directx
 )
 # link
-target_link_directories(${PROJECT_NAME} PUBLIC
-  ${CMAKE_SOURCE_DIR}/SokuLib/lib
-)
 target_link_libraries(${PROJECT_NAME} PRIVATE
   SokuLib
   Shlwapi
   d3dx9
 )
+if (${MY_LUA_EXPORT})
+  target_link_libraries(${PROJECT_NAME} PRIVATE LuaBridge lua::lua)
+endif()
 # compile
 target_compile_definitions(${PROJECT_NAME} PRIVATE
   _CRT_SECURE_NO_WARNINGS
   # XP 
   WINVER=0x0501 _WIN32_WINNT=0x0501
 )
+if (${MY_LUA_EXPORT})
+  target_compile_definitions(${PROJECT_NAME} PRIVATE SPR_LUA_EXPORT)
+endif()
+
 # generator specified
 if(MSVC)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -104,7 +109,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 
 # install
-set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}" CACHE PATH "Install prefix, can be targeted to game folder.")
+set(CMAKE_INSTALL_PREFIX "${MY_GAME_FOLDER}" CACHE PATH "Install prefix, can be targeted to game folder." FORCE)
 cmake_path(APPEND CMAKE_INSTALL_PREFIX "modules" "${PROJECT_NAME}" OUTPUT_VARIABLE CMAKE_INSTALL_DIR)
 message("Will install to ${CMAKE_INSTALL_DIR}")
 # copy dll
