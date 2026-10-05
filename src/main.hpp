@@ -16,6 +16,10 @@
 
 #include "SokuLib.hpp"
 
+#ifndef SPR_EXPORTS
+#define SPR_EXPORTS
+#endif
+
 namespace spr {
 	constexpr DWORD SHADER0_BYTECODE_OFFSET = 0x85a608;
 	constexpr size_t SHADER0_BYTECODE_SIZE = 0x4d0;
@@ -260,17 +264,20 @@ namespace spr {
 				waiting.pop();
 			}
 		}*/
-		void AsyncRequire(const Key& key, void* ed = nullptr, size_t es = 0, const Path& fp= {});
-		inline void NotifyTasker() {
-			tasker.startWorkerIfNeeded(600);
+		void AsyncRequire(const Key& key, const void* ed = nullptr, size_t es = 0, const Path& fp= {});
+		inline void NotifyTasker(int delay=0) {
+			tasker.startWorkerIfNeeded(delay);
 			tasker._queueCv.notify_one();
 		}
-		Effect* LutSwitch(int type) {
+		Effect* LutSwitchShader(int type) {
 			const auto entry = lut.getEntryByType(type);
 			if (!entry) return nullptr;
 			Effect* fx = get(entry->effectName);
 			if (fx && fx->Switch(entry->techIndex, entry->passIndex)) return fx;
 			return nullptr;
+		}
+		inline std::optional<int> LutFindShader(const std::string& uri) {
+			return lut.getShaderTypeByURI(uri);
 		}
 	};
 

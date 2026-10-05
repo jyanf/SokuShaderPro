@@ -4,6 +4,8 @@
 #include <Windows.h>
 #include <Shlwapi.h>
 
+#include "export.hpp"
+
 HMODULE spr::hModule = NULL;
 const std::filesystem::path& spr::GetModuleFolder() {
 	static std::filesystem::path cache{};
@@ -80,8 +82,72 @@ extern "C" __declspec(dllexport) int getPriority()
 
 //getType
 
-//
+// Preparation, call them as early as possible!
+extern "C" __declspec(dllexport) bool SubmitCompile(const char* name, const void* data, size_t size, const wchar_t* filepath)
+{
+	if (!name) return false;
+	auto& EM = spr::EffectManager::instance();
+	EM.AsyncRequire(std::string(name), data, size, filepath);
+}
 
-//Begin
+extern "C" __declspec(dllexport) bool SubmitCompileFromFile(const char* name, const wchar_t* filepath)
+{
+	if (!name || !filepath) return false;
+	auto& EM = spr::EffectManager::instance();
+	EM.AsyncRequire(std::string(name), nullptr, 0, filepath);
+}
 
-//End
+extern "C" __declspec(dllexport) bool SubmitCompileFromData(const char* name, const void* data, size_t size)
+{
+	if (!name || !data || size == 0) return false;
+	auto& EM = spr::EffectManager::instance();
+	EM.AsyncRequire(std::string(name), data, size);
+	return true;
+}
+
+
+// Query shaderType by uri (returns -1 if not found)
+extern "C" __declspec(dllexport) int GetShaderIdFromURI(const char* uri)
+{
+	if (!uri) return 0;
+	auto& EM = spr::EffectManager::instance();
+	return EM.LutFindShader(std::string(uri)).value_or(0);
+}
+
+// Return Effect* as opaque pointer (void*).
+// The inner state is set already for begin and end pair
+// Caller must not delete.
+extern "C" __declspec(dllexport) HANDLE GetEffectReady(int shaderType)
+{
+	auto& EM = spr::EffectManager::instance();
+	spr::Effect* fx = EM.LutSwitchShader(shaderType);
+	return reinterpret_cast<HANDLE>(fx);
+}
+
+//// Flexible wrappers to call Effect methods
+//extern "C" __declspec(dllexport) bool Effect_Switch(void* effectPtr, const char* techName, int pass)
+//{
+//	if (!effectPtr) return false;
+//	auto fx = reinterpret_cast<spr::Effect*>(effectPtr);
+//	// techName may be null -> use index-based switch if pass provided
+//	if (techName) {
+//		return fx->Switch(techName, pass);
+//	}
+//	else {
+//		return fx->Switch(-1, pass); // treat pass as tech index if techName null
+//	}
+//}
+
+extern "C" __declspec(dllexport) bool Effect_Begins(HANDLE effectPtr)
+{
+	if (!effectPtr) return false;
+	auto fx = reinterpret_cast<spr::Effect*>(effectPtr);
+	return fx->Begins();
+}
+
+extern "C" __declspec(dllexport) bool Effect_Ends(HANDLE effectPtr)
+{
+	if (!effectPtr) return false;
+	auto fx = reinterpret_cast<spr::Effect*>(effectPtr);
+	return fx->Ends();
+}

@@ -90,7 +90,7 @@ namespace spr {
 		}
 	}
 
-	void EM::AsyncRequire(const Key& key, void* ed, size_t es, const Path& fp) {
+	void EM::AsyncRequire(const Key& key, const void* ed, size_t es, const Path& fp) {
 		// allocate copy if ed != nullptr and es > 0
 		void* copyPtr = nullptr;
 		if (ed && es > 0) {

@@ -16,7 +16,7 @@ namespace {
 		} break;
 		default://custom part
 			if (-RESERVE_SHADER_COUNT <= shaderType && shaderType < 0) return false;
-			auto fx = EM::instance().LutSwitch(shaderType);
+			auto fx = EM::instance().LutSwitchShader(shaderType);
 			if (fx) {
 				auto _ = fx->GetRenderGuard();
 				This->sprite.render();

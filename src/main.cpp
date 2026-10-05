@@ -102,7 +102,7 @@ bool Effect::MyCreateEffect(void* pdata, size_t psize) {
 		ret = CreateEffectWarm(*this, "SpellBgBlend", (void*)fx_SpellBgBlend_bytecode, sizeof(fx_SpellBgBlend_bytecode));
 	} else if constexpr (FX == 1) {
 		//extras
-		EM::instance().NotifyTasker();
+		EM::instance().NotifyTasker(600);//wait for other submit
 		//org
 		Effect::AddListenerWrapper(this);
 		ret = CreateEffectWarm(*this, "Battle", (void*)fx_Battle_bytecode, sizeof(fx_Battle_bytecode));
