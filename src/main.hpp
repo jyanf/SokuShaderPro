@@ -127,7 +127,7 @@ namespace spr {
 				this->effect->SetTechnique(tTech);
 				tTech = NULL;
 			}
-			this->effect->Begin(nullptr, 0);//auto saves states
+			this->effect->Begin(nullptr, D3DXFX_DONOTSAVESAMPLERSTATE);//auto saves states, except texture sampler
 			this->effect->BeginPass(passOverride>=0 ? passOverride : this->tPass);
 			_begined = true;
 			return true;
@@ -175,7 +175,7 @@ namespace spr {
 			std::atomic<bool> _stopWorker{ false };
 		public:
 			void workerLoop();
-			void startWorkerIfNeeded();
+			void startWorkerIfNeeded(int delayms = 0);
 			void stopWorker();
 		} tasker;
 		// LUT tech & pass meta <--> shaderType
@@ -262,8 +262,8 @@ namespace spr {
 		}*/
 		void AsyncRequire(const Key& key, void* ed = nullptr, size_t es = 0, const Path& fp= {});
 		inline void NotifyTasker() {
+			tasker.startWorkerIfNeeded(600);
 			tasker._queueCv.notify_one();
-			tasker.startWorkerIfNeeded();
 		}
 		Effect* LutSwitch(int type) {
 			const auto entry = lut.getEntryByType(type);

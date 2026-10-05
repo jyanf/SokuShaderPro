@@ -34,7 +34,7 @@ namespace {
 		};
 		effect->SetVector("v4Arg0", &tcolor);
 		effect->CommitChanges();
-		effect->Begin(nullptr, 0);
+		effect->Begin(nullptr, D3DXFX_DONOTSAVESAMPLERSTATE);
 		auto ret = effect->BeginPass(7);//P7
 		//void __fastcall CSpriteEx_DrawRectSpriteWithVS(CSpriteEx * This);
 		reinterpret_cast<void(__fastcall*)(SokuLib::SpriteEx*)>(0x4076b0)(&This->sprite);

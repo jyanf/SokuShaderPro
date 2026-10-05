@@ -6,7 +6,6 @@ namespace {
 }
 namespace spr {
 	void EM::Tasker::workerLoop() {
-		std::this_thread::sleep_for(1000ms);//wait for minor requires
 		std::cout 
 			<< "EffectManager.workerLoop: worker started"
 			<< std::endl;
@@ -32,29 +31,8 @@ namespace spr {
 				<< "EffectManager.workerLoop: processing task '" + task.name + "' size=" + std::to_string(task.size)
 				<< std::endl;
 
-			// Try entering the D3D context lock; if fail, sleep and retry until success or stop requested
-			//bool entered = false;
-			//while (!_stopWorker) {
-			//	if (TryEnterCriticalSection(&g_D3DContextLock)) {
-			//		entered = true;
-			//		break;
-			//	}
-			//	else {
-			//		// try failed -> spec: wait 1s and retry
-			//		std::cout << "EffectManager.workerLoop: TryEnterCriticalSection failed, sleeping 1s before retry for task '" + task.name + "'";
-			//		std::this_thread::sleep_for(200ms);
-			//	}
-			//}
-			//if (_stopWorker) {
-			//	// cleanup buffer and break
-			//	if (task.data) { delete[] reinterpret_cast<char*>(task.data); task.data = nullptr; }
-			//	break;
-			//}
-
 			// try to materialize effect; if creation fails for reasons other than try-enter, do not auto-retry
 			EM::instance().get_or_open(task.name, task.data, task.size, task.filepath);
-
-			//LeaveCriticalSection(&g_D3DContextLock);
 
 			// free copied buffer (owned by task)
 			if (task.data) { delete[] reinterpret_cast<char*>(task.data); task.data = nullptr; }
@@ -66,24 +44,41 @@ namespace spr {
 		_workerRunning = false;
 	}
 
-	void EM::Tasker::startWorkerIfNeeded() {
-		bool expect = false;
-		if (!_workerRunning && !_stopWorker) {
-			//ensure only one thread starts the worker
-			std::lock_guard<std::mutex> lk(_queueMtx);
-			if (!_worker.joinable()) {
-				_stopWorker = false;
-				_worker = std::thread([this]() { this->workerLoop(); });
-				// detach is avoided; join in stopWorker / destructor
+	void EM::Tasker::startWorkerIfNeeded(int delayms) {
+		std::lock_guard<std::mutex> lk(_queueMtx);
+		if (_stopWorker) return;
+		if (_worker.joinable() && !_workerRunning) {
+			try {
+				_worker.join();
+			} catch(const std::exception& e) {//...
+			}
+		}
+		//ensure only one thread starts the worker
+		if (!_worker.joinable()) {
+			_stopWorker = false;
+			try {
+				_worker = std::thread([this, delayms]() { 
+					if (delayms > 0) {
+						std::this_thread::sleep_for(std::chrono::milliseconds(delayms));
+					}
+					this->workerLoop(); 
+				});
+			} catch (...) {
+				_stopWorker = true;
+				throw;
 			}
 		}
 	}
 
 	void EM::Tasker::stopWorker() {
-		_stopWorker= true;
+		_stopWorker = true;
 		_queueCv.notify_all();
 		if (_worker.joinable()) {
-			_worker.join();
+			try {
+				_worker.join();
+			} catch (const std::exception& e) {//...
+			}
+			_worker = std::thread();
 		}
 		_workerRunning = false;
 		// cleanup any pending tasks' buffers

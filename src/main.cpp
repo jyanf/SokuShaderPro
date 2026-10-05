@@ -11,12 +11,14 @@
 #include "battle_ex.hpp"
 
 namespace spr {
-	//EffectManager EffectManager::instance;
 	using EM = EffectManager;
+	
 	CBaseEffect& EM::g_EffectBattle = *reinterpret_cast<CBaseEffect*>(0x89aafc);
 	//Fun_CreateEffect ogCreateEffect = nullptr;
 	volatile bool Effect::_begined = false;
 	auto& g_D3DContextLock = *reinterpret_cast<CRITICAL_SECTION*>(0x8a0e14);
+
+	decltype(&EM::OnClose) EM::ogOnClose = nullptr;
 	
 static std::filesystem::path get_effect_file(const char* file) {
 	using std::filesystem::path, std::filesystem::is_regular_file;
@@ -46,7 +48,11 @@ HRESULT Effect::CreateEffectWarm(Effect& result, const char* fxname, void* pdata
 		| D3DXFX_NOT_CLONEABLE //btw never D3DXFX_LARGEADDRESSAWARE
 		;
 	auto& path = (filepath.empty() || !std::filesystem::is_regular_file(filepath)) ? get_effect_file(fxname) : filepath;
-	if (!path.empty()) {
+	if (path.empty()) {
+		std::cout << DYELLOW
+			<< "Cannot found target file of shader \""<<fxname<<"\", fallback to embedded binary."
+			<< DORG << std::endl;
+	} else {
 		std::wcout << DYELLOW
 			<< "Loading/Compiling D3DXEffect from file: \n\t" << path.c_str() 
 			<< DORG << std::endl;
@@ -107,11 +113,28 @@ bool Effect::MyCreateEffect(void* pdata, size_t psize) {
 		//no AddListenerWrapper cuz already called in org
 		return (this->*OrgCreateEffect<FX>{})(pdata, psize);
 	}
-	this->debug(ret);
+	//this->debug(ret);//don't need you for now
 	return ret == D3D_OK;
 }
 
-	decltype(&EffectManager::OnClose) EffectManager::ogOnClose = nullptr;
+	static void Tamper_FixBeginSaveFlag() {
+		constexpr byte fixflag = D3DXFX_DONOTSAVESAMPLERSTATE;
+		constexpr DWORD flags[] = {
+			0x470496, // Spell Background
+			0x7fb10f, // Draw Add
+			0x7fb1b7, // Draw Tint
+			0x7fb254, // Draw Gray
+			0x7fb302, // Draw Utsuho
+			0x7fb43b, // Draw Utsuho Add
+			0x7fb528, // Draw Utsuho Gray
+		};
+
+		// new d3dxeffect runtime restores staged texture with sampler state
+		// which conflicts with game's org texture stage buffer mechanism
+		for (auto p : flags) *(byte*)p |= fixflag;
+		std::cout << "All ID3DXEffect::Begin() flag tampered." << std::endl;
+	}
+/*****************************    TotalInit    ********************************/
 void Initialize() {
 	//spell bg
 	Effect::OrgCreateEffect<0>_v0 = SokuLib::TamperNearCall(0x471665, &Effect::MyCreateEffect<0>);
@@ -119,7 +142,8 @@ void Initialize() {
 	Effect::OrgCreateEffect<1>_v1 = SokuLib::TamperNearCall(0x7fb030, &Effect::MyCreateEffect<1>);
 	//utsuho cape limited render (unused)
 	Effect::OrgCreateEffect<2>_v2 = SokuLib::TamperNearCall(0x7fb049, &Effect::MyCreateEffect<2>);
-
+	Tamper_FixBeginSaveFlag();
+	// 
 	//on soku close
 	EffectManager::ogOnClose = SokuLib::TamperNearCall(0x440568, &EffectManager::OnClose);
 
