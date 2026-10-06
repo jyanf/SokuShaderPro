@@ -1,7 +1,7 @@
 #ifdef SPR_LUA_EXPORT
 
 #include "main.hpp"
-extern "C" {
+extern "C" {//how did shady-packer avoid this
     #include <lua.h>
     #include <lauxlib.h>
 }

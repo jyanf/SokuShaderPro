@@ -31,8 +31,29 @@ namespace spr {
 				<< "EffectManager.workerLoop: processing task '" + task.name + "' size=" + std::to_string(task.size)
 				<< std::endl;
 
-			// try to materialize effect; if creation fails for reasons other than try-enter, do not auto-retry
-			EM::instance().get_or_open(task.name, task.data, task.size, task.filepath);
+			// try to materialize effect; if an effect with same name exists, replace it
+			// with a freshly created one; otherwise insert a new one.
+			{
+				auto existing = EM::instance().get(task.name);
+				if (existing) {
+					// create new effect first; only replace if creation succeeded
+					Effect* newEff = nullptr;
+					try {
+						newEff = new Effect(task.name, task.data, task.size, task.filepath);
+					} catch (...) {
+						newEff = nullptr;
+					}
+					if (newEff && newEff->check()) {
+						EM::instance().replace(task.name, newEff);
+					} else {
+						// creation failed; free and keep old one
+						if (newEff) delete newEff;
+					}
+				} else {
+					// not present: create/insert via existing API
+					EM::instance().get_or_open(task.name, task.data, task.size, task.filepath);
+				}
+			}
 
 			// free copied buffer (owned by task)
 			if (task.data) { delete[] reinterpret_cast<char*>(task.data); task.data = nullptr; }

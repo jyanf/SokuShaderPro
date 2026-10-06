@@ -9,6 +9,7 @@
 #include <mutex>
 #include <vector>
 #include <optional>
+#include <shared_mutex>
 
 #include "d3d9.h"
 #include "d3dx9.h"
@@ -146,7 +147,7 @@ namespace spr {
 		}
 		inline RenderGuard GetRenderGuard() { return *this; }
 	};
-	class EffectManager : std::unordered_map<std::string, Effect*> {
+	class EffectManager : protected std::unordered_map<std::string, Effect*> {
 		using Key = value_type::first_type;
 		using Value = value_type::second_type;
 		using Base = std::unordered_map<Key, Value>;
@@ -155,12 +156,6 @@ namespace spr {
 		EffectManager() = default;
 		EffectManager(const EffectManager&) = delete; EffectManager(EffectManager&&) = delete;
 		EffectManager& operator=(const EffectManager&) = delete; EffectManager& operator=(EffectManager&&) = delete;
-		inline virtual ~EffectManager() {
-			tasker.stopWorker();
-			for (auto& [k, v] : (*this)) {
-				delete (CBaseEffect*)v;//should not remove listener cuz the whole game is closing
-			}
-		}
 		class Tasker {
 			friend EffectManager;
 			struct Task {
@@ -203,6 +198,7 @@ namespace spr {
 			inline int _allocId() {
 				return _nextId++; // just linear
 			}
+			void refreshURI(const Entry& entry, int id = 0);
 		public:
 			LUT() = default;
 			LUT(int reserved_no) : _nextId(reserved_no) {}
@@ -210,7 +206,7 @@ namespace spr {
 			std::optional<int> getShaderTypeByURI(const std::string_view& uri);
 			const Entry* getEntryByType(int shaderType);
 		} lut;
-
+		mutable std::shared_mutex mtx_; //map_
 	public:
 		static CBaseEffect& g_EffectBattle;
 		//singleton
@@ -219,23 +215,26 @@ namespace spr {
 			return instance;
 		}
 		inline static void OnClose() {
+			// stop worker first
 			instance().tasker.stopWorker();
-			for (auto& [k, v] : instance()) {
-				delete v;
+			{ std::unique_lock lock(instance().mtx_);
+				for (auto& p : instance()) {
+					delete p.second;
+				}
+				instance().clear();
 			}
-			instance().clear();
 			if (ogOnClose) return ogOnClose();
 		}
 		static decltype(&OnClose) ogOnClose;
 
-		inline Value get(Key key) {
+		inline Value get(const Key& key) {
+			std::shared_lock lock(mtx_);
 			auto it = this->find(key);
-			if (it!=this->end()) {
-				return it->second;
-			}
+			if (it != this->end()) return it->second;
 			return nullptr;
 		}
-		inline Value& get_or_open(Key key, void* ed=nullptr, size_t es=0, const Path& fp={}) {
+		inline Value& get_or_open(const Key& key, void* ed = nullptr, size_t es = 0, const Path& fp = {}) {
+			std::unique_lock lock(mtx_);
 			auto [it, inserted] = this->try_emplace(key, nullptr);
 			if (inserted) {
 				it->second = new Effect(key, ed, es, fp);
@@ -243,35 +242,31 @@ namespace spr {
 			}
 			return it->second;
 		}
-		inline Value& operator[](Key key) {
+		inline Value& operator[](const Key& key) {
 			return get_or_open(key);
 		}
-		inline void close(Key key) {
+		inline void replace(const Key& key, const Value& effect) {
+			std::unique_lock lock(mtx_);
 			auto it = this->find(key);
 			if (it != this->end()) {
 				delete it->second;
-				this->erase(it);
+				it->second = effect;
+			} else {
+				// insert if not exists
+				(*this)[key] = effect;
 			}
+			// ensure LUT is updated for the new effect
+			lut.registerEffect(key, effect);
 		}
 
-		/*
-		void require(Key key, void* ed = nullptr, size_t es = 0) {
-			waiting.emplace(key, ed, es);
-		}
-		void open_all() {
-			while (!waiting.empty()) {
-				auto& info = waiting.front();
-				get_or_open(info.name, info.embedded_data, info.embedded_size);
-				waiting.pop();
-			}
-		}*/
-		void AsyncRequire(const Key& key, const void* ed = nullptr, size_t es = 0, const Path& fp= {});
-		inline void NotifyTasker(int delay=0) {
+		void AsyncRequire(const Key& key, const void* ed = nullptr, size_t es = 0, const Path& fp = {});
+
+		inline void NotifyTasker(int delay = 0) {
 			tasker.startWorkerIfNeeded(delay);
 			tasker._queueCv.notify_one();
 		}
 		Effect* LutSwitchShader(int type) {
-			const auto entry = lut.getEntryByType(type);
+			auto entry = lut.getEntryByType(type);
 			if (!entry) return nullptr;
 			Effect* fx = get(entry->effectName);
 			if (fx && fx->Switch(entry->techIndex, entry->passIndex)) return fx;
@@ -279,6 +274,14 @@ namespace spr {
 		}
 		inline std::optional<int> LutFindShader(const std::string& uri) {
 			return lut.getShaderTypeByURI(uri);
+		}
+
+		inline virtual ~EffectManager() {
+			std::unique_lock lock(mtx_);
+			tasker.stopWorker();
+			for (auto& [k, v] : (*this)) {
+				delete (CBaseEffect*)v;//should not remove listener cuz the whole game is closing
+			}
 		}
 	};
 

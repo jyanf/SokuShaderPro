@@ -6,7 +6,7 @@ namespace {
 	using spr::Effect;
 
 
-	inline static std::string join(const std::string& a, const std::string& b, const std::string& c) {
+	inline static std::string uri_join(const std::string& a, const std::string& b, const std::string& c) {
 		return a + "::" + b + "::" + c;
 	}
 
@@ -35,8 +35,27 @@ namespace {
 		}
 		return out;
 	}
+	inline std::string index2string(int idx) {
+		return std::to_string(idx);
+	}
 }
-	
+
+void EM::LUT::refreshURI(const EM::LUT::Entry& entry, int id) {
+	//flattened uri
+	//	effect::techIndex::passIndex
+	std::string k1 = uri_join(entry.effectName,  index2string(entry.techIndex), index2string(entry.passIndex));
+	//	effect::techName::passIndex
+	std::string k2 = uri_join(entry.effectName, entry.techName, index2string(entry.passIndex));
+	//	effect::techIndex::passName
+	std::string k3 = uri_join(entry.effectName, index2string(entry.techIndex), entry.passName);
+	//	effect::techName::passName
+	std::string k4 = uri_join(entry.effectName, entry.techName, entry.passName);
+
+	_keyToId[k1] = id;
+	_keyToId[k2] = id;
+	_keyToId[k3] = id;
+	_keyToId[k4] = id;
+}
 
 void EM::LUT::registerEffect(const std::string& effectName, Effect* eff) {
 	if (!eff || !eff->check()) return;
@@ -53,7 +72,11 @@ void EM::LUT::registerEffect(const std::string& effectName, Effect* eff) {
 			<< "LUT.registerEffect: found existing mappings for [" + effectName + "], removing " + std::to_string(existing->second.size()) + " ids"
 			<< DORG << std::endl;
 		for (int id : existing->second) {
-			_idToEntry.erase(id);
+			auto it = _idToEntry.find(id);
+			if (it != _idToEntry.end()) {
+				refreshURI(it->second);
+				_idToEntry.erase(it);
+			}
 		}
 		existing->second.clear();
 	}
@@ -64,7 +87,7 @@ void EM::LUT::registerEffect(const std::string& effectName, Effect* eff) {
 	while (hTech = GetNextTechnique(dx, hTech)) {
 		D3DXTECHNIQUE_DESC tdesc;
 		if (FAILED(dx->GetTechniqueDesc(hTech, &tdesc))) {
-			std::cout <<DRED 
+			std::cout << DRED
 				<<"LUT.registerEffect: GetTechniqueDesc failed. tech index " + std::to_string(techIdx)
 				<< DORG <<std::endl;
 			++techIdx;
@@ -87,10 +110,10 @@ void EM::LUT::registerEffect(const std::string& effectName, Effect* eff) {
 
 			int id = _allocId();
 			int passIdx = static_cast<int>(p);
-			_idToEntry.emplace(std::piecewise_construct,
-				std::forward_as_tuple(id), 
-				std::forward_as_tuple(effectName, techIdx, techName, passIdx, passName)
-			);
+			auto [entry, inserted] = _idToEntry.insert_or_assign(id, Entry{
+				effectName, techIdx, techName, passIdx, passName
+			});
+			refreshURI(entry->second, id);
 			_effectToIds[effectName].push_back(id);
 			std::cout<< DCYAN 
 				<< "LUT.registerEffect: mapped shaderType=" << DBOLD << std::to_string(id) << "; "
@@ -99,20 +122,6 @@ void EM::LUT::registerEffect(const std::string& effectName, Effect* eff) {
 					+ techName + "(" + std::to_string(techIdx) + ")." 
 					+ passName + "(" + std::to_string(passIdx) + ")\""
 				<< DORG << std::endl;
-			//flattened uri
-			//	effect::techIndex::passIndex
-			//	effect::techName::passIndex
-			//	effect::techIndex::passName
-			//	effect::techName::passName
-			std::string k1 = join(effectName, std::to_string(techIdx), std::to_string(passIdx));
-			std::string k2 = join(effectName, techName, std::to_string(passIdx));
-			std::string k3 = join(effectName, std::to_string(techIdx), passName);
-			std::string k4 = join(effectName, techName, passName);
-
-			_keyToId.emplace(k1, id);
-			_keyToId.emplace(k2, id);
-			_keyToId.emplace(k3, id);
-			_keyToId.emplace(k4, id);
 		}
 		++techIdx;
 	}
@@ -128,7 +137,7 @@ std::optional<int> EM::LUT::getShaderTypeByURI(const std::string_view& uri) {
 	if (parts.size() != 3) return std::nullopt;
 	std::lock_guard<std::mutex> lk(_mtx);
 	
-	std::string k = join(parts[0], parts[1], parts[2]);
+	std::string k = uri_join(parts[0], parts[1], parts[2]);
 	auto it = _keyToId.find(k);
 	if (it != _keyToId.end()) return it->second;
 	std::cout << DRED 
