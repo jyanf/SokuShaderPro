@@ -104,6 +104,13 @@ extern "C" __declspec(dllexport) void SubmitCompileFromData(const char* name, co
 	EM.AsyncRequire(std::string(name), data, size);
 }
 
+extern "C" __declspec(dllexport) bool CheckCompileSuccess(const char* name)
+{
+	if (!name) return false;
+	auto& EM = spr::EffectManager::instance();
+	return EM.get(name);
+}
+
 
 // Query shaderType by uri (returns -1 if not found)
 extern "C" __declspec(dllexport) int GetShaderIdFromURI(const char* uri)

@@ -110,6 +110,7 @@ namespace spr {
 		inline bool check() {
 			return this->effect && enabled;
 		}
+	//TODO: added setfloat and commit changes etc
 		template<typename T> void Set(LPCSTR key, T in);
 		inline void Commit() { if (check()) { this->effect->CommitChanges(); } }
 		inline bool Switch(LPCSTR techName, short pass=-1) {

@@ -39,12 +39,21 @@ static void lua_SubmitCompileFromData(const std::string& name, const std::string
     return SubmitCompileFromData(name.c_str(), data.data(), data.size());
 }
 
+static bool lua_CheckCompileSuccess(const std::string& name) {
+    return CheckCompileSuccess(name.c_str());
+}
+
 static int lua_GetShaderIdFromURI(const std::string& uri) {
     return GetShaderIdFromURI(uri.c_str());
 }
 
-static void* lua_GetEffectReady(int shaderType) {
-    return GetEffectReady(shaderType);
+static int lua_GetEffectReady(lua_State* L) {
+    int shaderType = luaL_checkinteger(L, 1);
+    void* handle = GetEffectReady(shaderType);
+    if (handle) {
+        lua_pushlightuserdata(L, handle);
+    } else return 0;
+    return 1;
 }
 
 static bool lua_Effect_Begins(void* effectPtr) {
@@ -71,7 +80,9 @@ extern "C" __declspec(dllexport) int luaopen_ShaderPro(lua_State* L) {
         .addFunction("SubmitCompile", &lua_SubmitCompile) // (name, data_or_path, isFile)
         .addFunction("SubmitCompileFromFile", &lua_SubmitCompileFromFile) // (name, utf8Path)
         .addFunction("SubmitCompileFromData", &lua_SubmitCompileFromData) // (name, dataString)
+        .addFunction("CheckCompileSuccess", &lua_CheckCompileSuccess) // (name) -> boolean
         .addFunction("GetShaderIdFromURI", &lua_GetShaderIdFromURI) // (uri)
+        
         .addFunction("GetEffectReady", &lua_GetEffectReady) // (shaderType) -> lightuserdata
         .addFunction("Effect_Begins", &lua_Effect_Begins)
         .addFunction("Effect_Ends", &lua_Effect_Ends)

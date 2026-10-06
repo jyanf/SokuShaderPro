@@ -21,6 +21,9 @@ SPR_API void SubmitCompileFromFile(const char* name, const wchar_t* filepath);
 // 通过内存数据提交编译任务（异步）
 SPR_API void SubmitCompileFromData(const char* name, const void* data, size_t size);
 
+//检查当前异步编译是否成功
+SPR_API bool CheckCompileSuccess(const char* name);
+
 // 根据 URI 查找 shader id（shaderType）
 // 返回 0 表示未找到或错误
 SPR_API int GetShaderIdFromURI(const char* uri);
