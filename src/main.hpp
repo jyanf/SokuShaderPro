@@ -29,6 +29,8 @@ namespace spr {
 	constexpr DWORD SHADER2_BYTECODE_OFFSET = 0x861428;
 	constexpr size_t SHADER2_BYTECODE_SIZE = 0x684;
 
+	constexpr DWORD EFFECT_BEGIN_FLAG = 0;//D3DXFX_DONOTSAVESAMPLERSTATE;
+
 	struct CBaseEffect {
 		constexpr static auto ADDR_C_BASE_EFFECT_VTABLE = (void**)0x871334;
 		ID3DXEffect* effect = nullptr;
@@ -63,6 +65,7 @@ namespace spr {
 				if (data) data->Ends();
 			}
 		};
+		//static class StateManager smg;
 	public:
 		//do not add non-trivial member
 		bool enabled = false;
@@ -133,7 +136,7 @@ namespace spr {
 				this->effect->SetTechnique(tTech);
 				tTech = NULL;
 			}
-			this->effect->Begin(nullptr, D3DXFX_DONOTSAVESAMPLERSTATE);//auto saves states, except texture sampler
+			this->effect->Begin(nullptr, EFFECT_BEGIN_FLAG);//auto saves states
 			this->effect->BeginPass(passOverride>=0 ? passOverride : this->tPass);
 			_begined = true;
 			return true;
@@ -234,29 +237,40 @@ namespace spr {
 			return nullptr;
 		}
 		inline Value& get_or_open(const Key& key, void* ed = nullptr, size_t es = 0, const Path& fp = {}) {
+            Effect* created = nullptr;
 			std::unique_lock lock(mtx_);
 			auto [it, inserted] = this->try_emplace(key, nullptr);
 			if (inserted) {
 				it->second = new Effect(key, ed, es, fp);
-				lut.registerEffect(key, it->second);
+				created = it->second;
 			}
-			return it->second;
+			Value& result = it->second;
+			lock.unlock();
+			if (created) {
+				// register in LUT outside of EffectManager lock to avoid lock ordering deadlocks
+				lut.registerEffect(key, created);
+			}
+			return result;
 		}
 		inline Value& operator[](const Key& key) {
 			return get_or_open(key);
 		}
-		inline void replace(const Key& key, const Value& effect) {
-			std::unique_lock lock(mtx_);
-			auto it = this->find(key);
-			if (it != this->end()) {
-				delete it->second;
-				it->second = effect;
-			} else {
-				// insert if not exists
-				(*this)[key] = effect;
+      inline void replace(const Key& key, const Value& effect) {
+			Value toRegister = nullptr;
+			{
+				std::unique_lock lock(mtx_);
+				auto it = this->find(key);
+				if (it != this->end()) {
+					delete it->second;
+					it->second = effect;
+					toRegister = it->second;
+				} else {
+					(*this)[key] = effect;
+					toRegister = (*this)[key];
+				}
 			}
-			// ensure LUT is updated for the new effect
-			lut.registerEffect(key, effect);
+			// update LUT outside of EffectManager lock to avoid lock ordering deadlocks
+			if (toRegister) lut.registerEffect(key, toRegister);
 		}
 
 		void AsyncRequire(const Key& key, const void* ed = nullptr, size_t es = 0, const Path& fp = {});
@@ -305,7 +319,7 @@ std::filesystem::path GetIniPath();
 
 
 
-
+	extern decltype(&ID3DXEffect::End) ogEffectEnd;
 	extern CRITICAL_SECTION& g_D3DContextLock;
 	extern HMODULE hModule;
 }

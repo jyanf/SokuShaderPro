@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 # meta
-set(MY_VERSION 0.1.4 CACHE STRING "ShaderPro version (major.minor.patch [.build])")
+set(MY_VERSION 0.1.5 CACHE STRING "ShaderPro version (major.minor.patch [.build])")
 set(MY_DESCRIPTION "An superset of soku original shading and blending, introducing modern effects." CACHE STRING "description")
 option(MY_LUA_EXPORT "Export lua API" ON)
 set(MY_GAME_FOLDER "$ENV{TH123}" CACHE STRING "The game folder, related to install and debugging")
@@ -53,8 +53,14 @@ if(${BUILD_WITH_SHADERS})
 endif()
 
 # target
-file(GLOB_RECURSE GLOB_SOURCE_FILE CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/*.rc.in")
-file(GLOB_RECURSE GLOB_HEADER_FILE CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.hpp" "${CMAKE_SOURCE_DIR}/src/*.h")
+file(GLOB_RECURSE GLOB_SOURCE_FILE CONFIGURE_DEPENDS 
+  "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" 
+  "${CMAKE_SOURCE_DIR}/src/*.rc.in"
+)
+file(GLOB_RECURSE GLOB_HEADER_FILE CONFIGURE_DEPENDS 
+  "${CMAKE_SOURCE_DIR}/src/*.hpp" "${CMAKE_SOURCE_DIR}/src/*.h"
+  "${CMAKE_SOURCE_DIR}/distribution/export.h"
+)
 source_group(TREE "${CMAKE_SOURCE_DIR}/src" PREFIX "Source Files" FILES ${GLOB_SOURCE_FILE})
 source_group(TREE "${CMAKE_SOURCE_DIR}/src" PREFIX "Header Files" FILES ${GLOB_HEADER_FILE})
 add_library(${PROJECT_NAME} MODULE
@@ -71,7 +77,7 @@ endif()
 
 # include
 target_include_directories(${PROJECT_NAME} PRIVATE
-  ${CMAKE_SOURCE_DIR}/src
+  ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/distribution
   ${SHADER_INCLUDE_DIR}
   # ${CMAKE_SOURCE_DIR}/SokuLib/src ${CMAKE_SOURCE_DIR}/SokuLib/directx
 )
