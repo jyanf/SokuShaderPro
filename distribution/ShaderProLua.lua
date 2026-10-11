@@ -35,7 +35,7 @@ end
 ---@param filepath any
 function SPL.compileFileExternal(name, filepath)
     SPL._compiled[name] = false
-    return ShaderPro.SubmitCompileFromFile(name, data)
+    return ShaderPro.SubmitCompileFromFile(name, filepath)
 end
 
 ---获取Shader对应的有效shaderType

@@ -14,6 +14,12 @@ namespace {
 			myfx->Switch("BlendOverrides", -shaderType-1);
 			{ auto guard = myfx->GetRenderGuard(); This->sprite.render(); }
 		} break;
+		case -10: {
+			auto myfx = EM::instance().get("BattleEx");
+			if (!myfx) return false;
+			myfx->Switch("Extra", -shaderType-10);
+			{ auto guard = myfx->GetRenderGuard(); This->sprite.render(); }
+		} break;
 		default://custom part
 			if (-RESERVE_SHADER_COUNT <= shaderType && shaderType < 0) return false;
 			auto fx = EM::instance().LutSwitchShader(shaderType);
