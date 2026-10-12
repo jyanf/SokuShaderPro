@@ -1,5 +1,5 @@
 #pragma once
-#include "main.hpp"
+//#include "main.hpp"
 #include <Windows.h>
 
 #ifdef SPR_EXPORTS
@@ -24,6 +24,11 @@ SPR_API void SubmitCompileFromData(const char* name, const void* data, size_t si
 //检查当前异步编译是否成功
 SPR_API bool CheckCompileSuccess(const char* name);
 
+//根据名称，设置默认渲染时，Begin之前的callback，一般用于设置参数
+//void(__fastcall*callback)(SokuLib::v2::AnimationObject*, HANDLE, const char*, const char*)
+SPR_API void SetEffectCallback(const char* name, void* pf);
+SPR_API void UnsetEffectCallback(const char* name);
+
 // 根据 URI 查找 shader id（shaderType）
 // 返回 0 表示未找到或错误
 SPR_API int GetShaderIdFromURI(const char* uri);
@@ -36,3 +41,24 @@ SPR_API HANDLE GetEffectReady(int shaderType);
 // 若返回值为false，代表内部状态出错，此时不应使用
 SPR_API bool Effect_Begins(HANDLE effectPtr);
 SPR_API bool Effect_Ends(HANDLE effectPtr);
+
+// 按类型和名称设置fx参数
+// paraData为指向对应类型变量（数组）的指针
+// 指定count>1则为数组版本
+// 支持的typeName：
+/*TypeName	C/C++					Hlsl
+* "float"	—— FLOAT*				—— float, float[]
+* "int"		—— INT*					—— int, int[]
+* "bool"	—— bool*				—— bool, bool[]
+* "vector"	—— D3DXVECTOR4*			—— float4, float4[]
+* "matrix"	—— D3DXMATRIX*			—— matrix, matrix[]
+* "texture"	—— IDirect3DTexture9*	—— texture
+* "string"	—— CHAR*				—— string
+* "raw", ""	—— BYTE*				—— any
+*/
+// 返回值表示成功与否
+SPR_API bool Effect_SetValues(HANDLE effectPtr, const char* paraName, const void* paraData, UINT count, const char* typeName);
+
+// 设置所有fx参数后提交修改
+// 返回值表示成功与否
+SPR_API bool Effect_Commits(HANDLE effectPtr);

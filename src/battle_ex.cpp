@@ -22,18 +22,10 @@ namespace {
 		} break;
 		default://custom part
 			if (-RESERVE_SHADER_COUNT <= shaderType && shaderType < 0) return false;
-			auto fx = EM::instance().LutSwitchShader(shaderType);
+			std::string_view names[3];//fx, tech, pass
+			auto fx = EM::instance().LutSwitchShader(shaderType, names);
 			if (fx) {
-				//hasty
-				SokuLib::DrawUtils::DxSokuColor sc = This->renderInfos.shaderColor;
-				D3DXVECTOR4 scf {
-					sc.r / 255.0f, sc.g / 255.0f, sc.b / 255.0f, sc.a / 255.0f
-				};
-				if (SUCCEEDED(fx->effect->SetVector("ShaderColor", &scf))) {
-					fx->effect->CommitChanges();
-				}
-				//hasty
-				//add callback here?
+				fx->RunCallback(This, fx, names[1].data(), names[2].data());
 				auto _ = fx->GetRenderGuard();
 				This->sprite.render();
 			}

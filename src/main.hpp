@@ -16,6 +16,8 @@
 #include "d3dx9effect.h"
 
 #include "SokuLib.hpp"
+#include <lua.hpp>
+#include <LuaBridge/LuaBridge.h>
 
 #ifndef SPR_EXPORTS
 #define SPR_EXPORTS
@@ -65,12 +67,67 @@ namespace spr {
 				if (data) data->Ends();
 			}
 		};
-		//static class StateManager smg;
+		static void __fastcall DefaultCallback(SokuLib::v2::AnimationObject* This, HANDLE This2, const char* tech, const char* pass) {
+			SokuLib::DrawUtils::DxSokuColor sc = This->renderInfos.shaderColor;
+			auto fx = static_cast<Effect*>(This2);
+			D3DXVECTOR4 scf{
+				sc.r / 255.0f, sc.g / 255.0f, sc.b / 255.0f, sc.a / 255.0f
+			};
+			if (fx->Set("ShaderColor", &scf)) {
+				fx->Commits();
+			}
+		}
 	public:
 		//do not add non-trivial member
 		bool enabled = false;
 		int tPass=0;
 		D3DXHANDLE tTech = NULL;
+		void(__fastcall* callback)(SokuLib::v2::AnimationObject*, HANDLE, const char*, const char*) = DefaultCallback;
+		lua_State* subL = nullptr; int subroutine = LUA_REFNIL;//usually only one render thread, so no mutex?
+		int callbacklua = LUA_REFNIL;
+		inline void UnsetCallbackLua() {
+			if (subL && callbacklua!=LUA_REFNIL) {
+				luaL_unref(subL, LUA_REGISTRYINDEX, callbacklua);
+			}
+			callbacklua = LUA_REFNIL;
+		}
+		inline void SetCallbackC(void* pf) {
+			UnsetCallbackLua();
+			if (pf) {
+				callback = reinterpret_cast<decltype(callback)>(pf);
+			} else {
+				callback = DefaultCallback;
+			}
+		}
+		inline void SetCallbackLua(lua_State* L) {//on stack 1.name, 2.cb
+			callback = DefaultCallback;
+			if (!subL) {
+				subL = lua_newthread(L);
+				subroutine = luaL_ref(L, LUA_REGISTRYINDEX);
+			}
+			lua_pushvalue(L, 2);
+			callbacklua = luaL_ref(L, LUA_REGISTRYINDEX);
+		}
+		inline void __fastcall RunCallback(SokuLib::v2::AnimationObject* This, Effect* fx, const char* tech, const char* pass) {
+			bool skip = false;
+			if (subL && callbacklua != LUA_REFNIL) {
+				//memory.Callback, has lock itself
+				lua_rawgeti(subL, LUA_REGISTRYINDEX, callbacklua);
+				//luabridge::Stack<Effect*>::push(subL, fx);
+				lua_pushinteger(subL, (DWORD)fx);
+				lua_pushinteger(subL, (DWORD)This);
+				lua_pushstring(subL, tech);
+				lua_pushstring(subL, pass);
+				if (lua_pcall(subL, 4, 1, 0)) {
+					std::cout << lua_tostring(subL, -1);
+				} else {
+					skip = lua_toboolean(subL, -1);
+				} lua_pop(subL, 1);
+			}
+			if (!skip && callback) {
+				callback(This, (HANDLE)fx, tech, pass);
+			}
+		}
 
 		template<auto FX> bool MyCreateEffect(void* pdata, size_t psize);
 		template<auto FX>
@@ -108,15 +165,73 @@ namespace spr {
 			debug(ret);
 		}
 		inline ~Effect() {//with unregister
+			if (subL && subroutine) {
+				luaL_unref(subL, LUA_REGISTRYINDEX, subroutine);
+			}
 			//RemoveListenerWrapper(this); CBaseEffect::~CBaseEffect();
 			reinterpret_cast<void(__fastcall*)(CBaseEffect*)>(0x4181e0)(this);
 		}
 		inline bool check() {
 			return this->effect && enabled;
 		}
-	//TODO: added setfloat and commit changes etc
-		template<typename T> void Set(LPCSTR key, T in);
-		inline void Commit() { if (check()) { this->effect->CommitChanges(); } }
+		template<typename T> bool Set(LPCSTR key, const T* data, UINT count=1) {
+			if (!effect || !data)
+				return false;
+			HRESULT ret = -1;
+			if constexpr (std::is_same_v<T, bool>) {
+				if (count <= 1) {
+					BOOL temp = *data;
+					ret = effect->SetBool(key, *static_cast<const BOOL*>(&temp));
+				}
+				else {
+					std::vector<BOOL> temp(count);
+					for (int i = 0; i < count; ++i) {
+						temp[i] = data[i];
+					}
+					ret = effect->SetBoolArray(key, static_cast<const BOOL*>(temp.data()), count);
+				}
+			}
+			else if constexpr (std::is_same_v<T, INT>) {
+				if (count <= 1)
+					ret = effect->SetInt(key, *static_cast<const INT*>(data));
+				else
+					ret = effect->SetIntArray(key, static_cast<const INT*>(data), count);
+			}
+			else if constexpr (std::is_same_v<T, FLOAT>) {
+				if (count <= 1)
+					ret = effect->SetFloat(key, *static_cast<const FLOAT*>(data));
+				else
+					ret = effect->SetFloatArray(key, static_cast<const FLOAT*>(data), count);
+			}
+			else if constexpr (std::is_same_v<T, D3DXVECTOR4>) {
+				if (count <= 1)
+					ret = effect->SetVector(key, static_cast<const D3DXVECTOR4*>(data));
+				else
+					ret = effect->SetVectorArray(key, static_cast<const D3DXVECTOR4*>(data), count);
+			}
+			else if constexpr (std::is_same_v<T, D3DXMATRIX>) {
+				if (count <= 1)
+					ret = effect->SetMatrix(key, static_cast<const D3DXMATRIX*>(data));
+				else
+					ret = effect->SetMatrixArray(key, static_cast<const D3DXMATRIX*>(data), count);
+			}
+			else if constexpr (std::derived_from<T, IDirect3DBaseTexture9>) {
+				ret = effect->SetTexture(key, static_cast<IDirect3DBaseTexture9*>(const_cast<T*>(data)));
+			}
+			else if constexpr (std::is_same_v<T, CHAR>) {
+				ret = effect->SetString(key, static_cast<LPCSTR>(data));
+			}
+			else {
+				ret = effect->SetValue(key, data, sizeof(T) * count);
+			}
+			return SUCCEEDED(ret);
+		}
+		inline bool Commits() {
+			if (check()) {
+				return SUCCEEDED(this->effect->CommitChanges());
+			} 
+			return false; 
+		}
 		inline bool Switch(LPCSTR techName, short pass=-1) {
 			if (!check() || _begined) return false;
 			if (techName && !(this->tTech = this->effect->GetTechniqueByName(techName))) return false;
@@ -279,9 +394,14 @@ namespace spr {
 			tasker.startWorkerIfNeeded(delay);
 			tasker._queueCv.notify_one();
 		}
-		Effect* LutSwitchShader(int type) {
+		inline Effect* LutSwitchShader(int type, std::string_view* names = nullptr) {
 			auto entry = lut.getEntryByType(type);
 			if (!entry) return nullptr;
+			if (names) {
+				names[0] = entry->effectName;
+				names[1] = entry->techName;
+				names[2] = entry->passName;
+			}
 			Effect* fx = get(entry->effectName);
 			if (fx && fx->Switch(entry->techIndex, entry->passIndex)) return fx;
 			return nullptr;
@@ -314,8 +434,6 @@ void Initialize();
 const std::filesystem::path& GetModuleFolder();
 std::filesystem::path GetShaderFolder();
 std::filesystem::path GetIniPath();
-
-
 
 
 

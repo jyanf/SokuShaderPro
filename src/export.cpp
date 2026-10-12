@@ -111,6 +111,20 @@ extern "C" __declspec(dllexport) bool CheckCompileSuccess(const char* name)
 	return EM.get(name);
 }
 
+extern "C" __declspec(dllexport) void SetEffectCallback(const char* name, void* pf)
+{
+	if (!name) return;
+	auto& EM = spr::EffectManager::instance();
+	auto fx = EM.get(name);
+	fx->SetCallbackC(pf);
+}
+extern "C" __declspec(dllexport) void UnsetEffectCallback(const char* name)
+{
+	if (!name) return;
+	auto& EM = spr::EffectManager::instance();
+	auto fx = EM.get(name);
+	fx->SetCallbackC(nullptr);
+}
 
 // Query shaderType by uri (returns -1 if not found)
 extern "C" __declspec(dllexport) int GetShaderIdFromURI(const char* uri)
@@ -156,4 +170,40 @@ extern "C" __declspec(dllexport) bool Effect_Ends(HANDLE effectPtr)
 	if (!effectPtr) return false;
 	auto fx = reinterpret_cast<spr::Effect*>(effectPtr);
 	return fx->Ends();
+}
+
+extern "C" __declspec(dllexport) bool Effect_SetValues(HANDLE effectPtr, const char* paraName, const void* paraData, UINT count, const char* typeName)
+{
+	if (!effectPtr) return false;
+	auto fx = reinterpret_cast<spr::Effect*>(effectPtr);
+	std::string type(typeName);
+	std::transform(type.begin(), type.end(), type.begin(),
+		[](unsigned char c) {
+			return static_cast<char>(std::tolower(c));
+		});
+	if (type == "float")
+		return fx->Set(paraName, static_cast<const float*>(paraData), count);
+	else if (type == "int")
+		return fx->Set(paraName, static_cast<const int*>(paraData), count);
+	else if (type == "bool")
+		return fx->Set(paraName, static_cast<const bool*>(paraData), count);
+	else if (type == "vector")
+		return fx->Set(paraName, static_cast<const D3DXVECTOR4*>(paraData), count);
+	else if (type == "matrix")
+		return fx->Set(paraName, static_cast<const D3DXMATRIX*>(paraData), count);
+	else if (type == "texture")
+		return fx->Set(paraName, static_cast<const IDirect3DTexture9*>(paraData));
+	else if (type == "string")
+		return fx->Set(paraName, static_cast<LPCSTR>(paraData));
+	else {
+		return fx->Set(paraName, static_cast<const byte*>(paraData), count); 
+	}
+	return false;
+}
+
+extern "C" __declspec(dllexport) bool Effect_Commits(HANDLE effectPtr)
+{
+	if (!effectPtr) return false;
+	auto fx = reinterpret_cast<spr::Effect*>(effectPtr);
+	return fx->Commits();
 }

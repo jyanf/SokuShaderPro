@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 # meta
-set(MY_VERSION 0.1.5 CACHE STRING "ShaderPro version (major.minor.patch [.build])")
+set(MY_VERSION 0.2.0 CACHE STRING "ShaderPro version (major.minor.patch [.build])")
 set(MY_DESCRIPTION "An superset of soku original shading and blending, introducing modern effects." CACHE STRING "description")
 option(MY_LUA_EXPORT "Export lua API" ON)
 set(MY_GAME_FOLDER "$ENV{TH123}" CACHE STRING "The game folder, related to install and debugging")
