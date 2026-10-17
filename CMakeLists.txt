@@ -95,6 +95,9 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
   _CRT_SECURE_NO_WARNINGS
   # XP 
   WINVER=0x0501 _WIN32_WINNT=0x0501
+  # fix mutex incompatibility building on vs2022-1710 but run with old vc runtime;
+  # reference: https://github.com/microsoft/STL/issues/4730
+  _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR
 )
 if (${MY_LUA_EXPORT})
   target_compile_definitions(${PROJECT_NAME} PRIVATE SPR_LUA_EXPORT)
